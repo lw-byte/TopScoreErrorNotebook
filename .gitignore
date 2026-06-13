@@ -1,0 +1,16 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Screenshots
+*.jpg
+*.png
+*.jpeg
+
+# Skills reference (not project code)
+skills/
+
+# All markdown files except docs/
+*.md
+docs/*.md
+README.md
