@@ -13,4 +13,5 @@ skills/
 # All markdown files except docs/
 *.md
 docs/*.md
+!docs/状元错题集_Android技术设计_v1.0.md
 README.md
