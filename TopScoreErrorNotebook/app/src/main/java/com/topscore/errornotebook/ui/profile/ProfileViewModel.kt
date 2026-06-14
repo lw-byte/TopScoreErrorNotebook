@@ -2,8 +2,8 @@ package com.topscore.errornotebook.ui.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.topscore.errornotebook.data.sync.CloudSyncService
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,15 +19,16 @@ data class User(
     val avatarUrl: String? = null
 )
 
-enum class SyncStatus {
+enum class ProfileSyncStatus {
     IDLE, SYNCING, SUCCESS, FAILURE
 }
 
 data class ProfileState(
     val user: User = User(),
-    val syncStatus: SyncStatus = SyncStatus.IDLE,
+    val syncStatus: ProfileSyncStatus = ProfileSyncStatus.IDLE,
     val lastSyncTime: Instant? = null,
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val syncErrorMessage: String? = null
 )
 
 sealed class ProfileEvent {
@@ -37,10 +38,15 @@ sealed class ProfileEvent {
 }
 
 @HiltViewModel
-class ProfileViewModel @Inject constructor() : ViewModel() {
+class ProfileViewModel @Inject constructor(
+    private val cloudSyncService: CloudSyncService
+) : ViewModel() {
 
     private val _state = MutableStateFlow(ProfileState())
     val state: StateFlow<ProfileState> = _state.asStateFlow()
+
+    // TODO: Get from UserSession
+    private val authToken: String = "placeholder_auth_token"
 
     fun onEvent(event: ProfileEvent) {
         when (event) {
@@ -69,18 +75,35 @@ class ProfileViewModel @Inject constructor() : ViewModel() {
 
     private fun syncNow() {
         viewModelScope.launch {
-            _state.update { it.copy(syncStatus = SyncStatus.SYNCING) }
+            _state.update { it.copy(syncStatus = ProfileSyncStatus.SYNCING, syncErrorMessage = null) }
             try {
-                // TODO: actual sync logic
-                delay(1500)
-                _state.update {
-                    it.copy(
-                        syncStatus = SyncStatus.SUCCESS,
-                        lastSyncTime = Instant.now()
-                    )
+                val result = cloudSyncService.sync(
+                    authToken = authToken,
+                    mode = CloudSyncService.SyncMode.INCREMENTAL
+                )
+
+                if (result.success) {
+                    _state.update {
+                        it.copy(
+                            syncStatus = ProfileSyncStatus.SUCCESS,
+                            lastSyncTime = Instant.now()
+                        )
+                    }
+                } else {
+                    _state.update {
+                        it.copy(
+                            syncStatus = ProfileSyncStatus.FAILURE,
+                            syncErrorMessage = result.errorMessage
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                _state.update { it.copy(syncStatus = SyncStatus.FAILURE) }
+                _state.update {
+                    it.copy(
+                        syncStatus = ProfileSyncStatus.FAILURE,
+                        syncErrorMessage = e.message
+                    )
+                }
             }
         }
     }

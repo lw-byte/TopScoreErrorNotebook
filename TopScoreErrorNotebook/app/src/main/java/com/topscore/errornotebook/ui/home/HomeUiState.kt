@@ -7,7 +7,6 @@ import com.topscore.errornotebook.domain.model.Question
  */
 data class HomeUiState(
     val isLoading: Boolean = true,
-    val userName: String = "",
     val errorCount: Int = 0,
     val inProgressCount: Int = 0,
     val masteredCount: Int = 0,

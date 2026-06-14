@@ -18,7 +18,7 @@
     <string name="login_success">登录成功</string>
 
     <!-- Home -->
-    <string name="home_welcome">欢迎回来，%s</string>
+    <string name="home_welcome">欢迎回来</string>
     <string name="home_error_count">错题</string>
     <string name="home_in_progress">进行中</string>
     <string name="home_mastered">已掌握</string>
@@ -31,10 +31,22 @@
     <string name="search_hint">搜索题目内容…</string>
     <string name="filter">筛选</string>
     <string name="filter_stage">学段</string>
+    <string name="filter_subject">学科</string>
     <string name="filter_error_reason">错因</string>
     <string name="filter_all">全部</string>
     <string name="export">导出</string>
     <string name="selected_count">已选中 %d 道错题</string>
+
+    <!-- Subjects -->
+    <string name="subject_math">数学</string>
+    <string name="subject_chinese">语文</string>
+    <string name="subject_english">英语</string>
+    <string name="subject_physics">物理</string>
+    <string name="subject_chemistry">化学</string>
+    <string name="subject_biology">生物</string>
+    <string name="subject_politics">政治</string>
+    <string name="subject_history">历史</string>
+    <string name="subject_geography">地理</string>
 
     <!-- Add Question -->
     <string name="add_question_title">添加错题</string>

@@ -75,7 +75,6 @@ class HomeViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        userName = "用户", // TODO: 从 UserSession 或 Repository 获取
                         errorCount = errorCount,
                         inProgressCount = inProgressCount,
                         masteredCount = masteredCount,

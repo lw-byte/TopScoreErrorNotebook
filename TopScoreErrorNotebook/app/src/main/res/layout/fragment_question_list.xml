@@ -152,6 +152,102 @@
 
         </HorizontalScrollView>
 
+        <!-- Subject Filter -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/filter_subject"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chipGroupSubject"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                app:singleSelection="true">
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_subject_all"
+                    style="@style/Widget.TopScore.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="全部"
+                    android:checked="true" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_subject_math"
+                    style="@style/Widget.TopScore.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/subject_math" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_subject_chinese"
+                    style="@style/Widget.TopScore.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/subject_chinese" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_subject_english"
+                    style="@style/Widget.TopScore.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/subject_english" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_subject_physics"
+                    style="@style/Widget.TopScore.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/subject_physics" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_subject_chemistry"
+                    style="@style/Widget.TopScore.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/subject_chemistry" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_subject_biology"
+                    style="@style/Widget.TopScore.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/subject_biology" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_subject_politics"
+                    style="@style/Widget.TopScore.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/subject_politics" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_subject_history"
+                    style="@style/Widget.TopScore.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/subject_history" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_subject_geography"
+                    style="@style/Widget.TopScore.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/subject_geography" />
+
+            </com.google.android.material.chip.ChipGroup>
+
+        </HorizontalScrollView>
+
     </LinearLayout>
 
     <!-- RecyclerView -->
@@ -179,6 +275,18 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Export FAB -->
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/fabExport"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:text="@string/export"
+        android:visibility="gone"
+        app:icon="@drawable/ic_export"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- Empty State -->
     <LinearLayout

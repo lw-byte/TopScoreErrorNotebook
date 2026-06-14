@@ -1,11 +1,13 @@
 package com.topscore.errornotebook.ui.question
 
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.topscore.errornotebook.core.database.dao.ImageDao
 import com.topscore.errornotebook.core.database.dao.QuestionDao
 import com.topscore.errornotebook.core.database.toEntity
+import com.topscore.errornotebook.core.ocr.AlibabaOcrService
 import com.topscore.errornotebook.domain.model.ErrorReason
 import com.topscore.errornotebook.domain.model.OcrResult
 import com.topscore.errornotebook.domain.model.Question
@@ -77,7 +79,8 @@ sealed class AddQuestionEvent {
 @HiltViewModel
 class AddQuestionViewModel @Inject constructor(
     private val questionDao: QuestionDao,
-    private val imageDao: ImageDao
+    private val imageDao: ImageDao,
+    private val ocrService: AlibabaOcrService
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddQuestionUiState())
@@ -151,32 +154,46 @@ class AddQuestionViewModel @Inject constructor(
     }
 
     /**
-     * Perform OCR on the captured image
+     * Perform OCR on the captured image using Alibaba OCR API
      */
     private fun performOcr(imagePath: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             try {
-                // Simulate OCR recognition
-                // In production, this would call ML Kit or a backend OCR service
-                kotlinx.coroutines.delay(2000)
+                // Call Alibaba OCR service
+                val result = ocrService.recognizeText(imagePath)
 
-                val mockOcrResult = OcrResult(
-                    text = "这是一道数学选择题。\n题目：下列哪个是正确的是？\nA. 1+1=2\nB. 1+1=3\nC. 1+1=4\nD. 1+1=5",
-                    isComplete = true,
-                    hasHandwriting = false,
-                    handwritingRegions = null,
-                    confidence = 0.95f
+                result.fold(
+                    onSuccess = { ocrResult ->
+                        _uiState.update {
+                            it.copy(
+                                ocrResult = ocrResult,
+                                isLoading = false,
+                                currentStep = AddQuestionStep.CONFIRM_RESULT
+                            )
+                        }
+                    },
+                    onFailure = { e ->
+                        // Fallback to mock result if Alibaba OCR fails
+                        // In production, you might want to handle this differently
+                        val mockOcrResult = OcrResult(
+                            text = "这是一道数学选择题。\n题目：下列哪个是正确的是？\nA. 1+1=2\nB. 1+1=3\nC. 1+1=4\nD. 1+1=5",
+                            isComplete = true,
+                            hasHandwriting = false,
+                            handwritingRegions = null,
+                            confidence = 0.95f
+                        )
+                        _uiState.update {
+                            it.copy(
+                                ocrResult = mockOcrResult,
+                                isLoading = false,
+                                currentStep = AddQuestionStep.CONFIRM_RESULT,
+                                errorMessage = "OCR识别服务暂不可用，已使用模拟数据：${e.message}"
+                            )
+                        }
+                    }
                 )
-
-                _uiState.update {
-                    it.copy(
-                        ocrResult = mockOcrResult,
-                        isLoading = false,
-                        currentStep = AddQuestionStep.CONFIRM_RESULT
-                    )
-                }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(

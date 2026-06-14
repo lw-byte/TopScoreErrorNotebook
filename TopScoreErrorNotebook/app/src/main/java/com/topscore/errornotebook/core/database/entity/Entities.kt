@@ -79,7 +79,7 @@ data class QuestionEntity(
  */
 @Entity(
     tableName = "question_images",
-    indices = [Index(value = ["userId"])]
+    indices = [Index(value = ["userId"]), Index(value = ["syncStatus"])]
 )
 data class QuestionImageEntity(
     @PrimaryKey(autoGenerate = true)
@@ -108,6 +108,9 @@ data class QuestionImageEntity(
 
     @ColumnInfo(name = "ocrConfidence")
     val ocrConfidence: Float = 0f,
+
+    @ColumnInfo(name = "syncStatus")
+    val syncStatus: String = "PENDING",
 
     @ColumnInfo(name = "createdAt")
     val createdAt: Long

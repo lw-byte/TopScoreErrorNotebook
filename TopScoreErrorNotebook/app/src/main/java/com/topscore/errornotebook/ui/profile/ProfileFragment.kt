@@ -82,13 +82,13 @@ class ProfileFragment : Fragment() {
                         "Last sync: ${formatter.format(it)}"
                     } ?: "Never synced"
 
-                    binding.syncProgress.visibility = if (state.syncStatus == SyncStatus.SYNCING) {
+                    binding.syncProgress.visibility = if (state.syncStatus == ProfileSyncStatus.SYNCING) {
                         View.VISIBLE
                     } else {
                         View.GONE
                     }
 
-                    binding.btnSync.isEnabled = state.syncStatus != SyncStatus.SYNCING
+                    binding.btnSync.isEnabled = state.syncStatus != ProfileSyncStatus.SYNCING
 
                     binding.btnLogout.isEnabled = !state.isLoading
                 }

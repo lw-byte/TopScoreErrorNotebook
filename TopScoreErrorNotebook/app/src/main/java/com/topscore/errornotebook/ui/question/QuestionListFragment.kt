@@ -104,6 +104,19 @@ class QuestionListFragment : Fragment() {
             }
         }
         binding.chipReasonAll.setOnClickListener { applyErrorReasonFilter(null) }
+
+        // Subject filter chips
+        binding.chipSubjectAll.isChecked = true
+        binding.chipSubjectMath.setOnClickListener { applySubjectFilter("数学") }
+        binding.chipSubjectChinese.setOnClickListener { applySubjectFilter("语文") }
+        binding.chipSubjectEnglish.setOnClickListener { applySubjectFilter("英语") }
+        binding.chipSubjectPhysics.setOnClickListener { applySubjectFilter("物理") }
+        binding.chipSubjectChemistry.setOnClickListener { applySubjectFilter("化学") }
+        binding.chipSubjectBiology.setOnClickListener { applySubjectFilter("生物") }
+        binding.chipSubjectPolitics.setOnClickListener { applySubjectFilter("政治") }
+        binding.chipSubjectHistory.setOnClickListener { applySubjectFilter("历史") }
+        binding.chipSubjectGeography.setOnClickListener { applySubjectFilter("地理") }
+        binding.chipSubjectAll.setOnClickListener { applySubjectFilter(null) }
     }
 
     private fun applyStageFilter(stage: SubjectStage?) {
@@ -115,6 +128,11 @@ class QuestionListFragment : Fragment() {
         val currentFilter = viewModel.uiState.value.filter
         val reasons = if (reason != null) listOf(reason) else null
         viewModel.onEvent(QuestionListEvent.ApplyFilter(currentFilter.copy(errorReasons = reasons)))
+    }
+
+    private fun applySubjectFilter(subject: String?) {
+        val currentFilter = viewModel.uiState.value.filter
+        viewModel.onEvent(QuestionListEvent.ApplyFilter(currentFilter.copy(subject = subject)))
     }
 
     private fun getReasonChipId(reason: ErrorReason): Int {
@@ -135,6 +153,10 @@ class QuestionListFragment : Fragment() {
 
         binding.btnCancel.setOnClickListener {
             viewModel.onEvent(QuestionListEvent.ClearSelection)
+        }
+
+        binding.fabExport.setOnClickListener {
+            navigateToExport()
         }
     }
 
@@ -169,6 +191,9 @@ class QuestionListFragment : Fragment() {
         if (state.isSelectionMode) {
             binding.tvSelectedCount.text = getString(R.string.selected_count, state.selectedIds.size)
         }
+
+        // Show export FAB when there are filtered questions and not in selection mode
+        binding.fabExport.isVisible = !state.isSelectionMode && state.filteredQuestions.isNotEmpty()
     }
 
     private fun handleEvent(event: QuestionListEvent?) {
@@ -188,6 +213,13 @@ class QuestionListFragment : Fragment() {
     private fun navigateToDetail(questionId: Long) {
         val action = QuestionListFragmentDirections
             .actionQuestionListToQuestionDetail(questionId)
+        findNavController().navigate(action)
+    }
+
+    private fun navigateToExport() {
+        val questionIds = viewModel.uiState.value.filteredQuestions.map { it.id }.toLongArray()
+        val action = QuestionListFragmentDirections
+            .actionQuestionListToExport(questionIds)
         findNavController().navigate(action)
     }
 

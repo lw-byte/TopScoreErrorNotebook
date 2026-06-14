@@ -76,7 +76,7 @@ class HomeFragment : Fragment() {
         binding.contentLayout.visibility = if (state.isLoading) View.GONE else View.VISIBLE
 
         // 更新欢迎语
-        binding.textWelcome.text = getString(R.string.home_welcome, state.userName)
+        binding.textWelcome.text = getString(R.string.home_welcome)
 
         // 更新统计卡片
         binding.textErrorCount.text = state.errorCount.toString()
