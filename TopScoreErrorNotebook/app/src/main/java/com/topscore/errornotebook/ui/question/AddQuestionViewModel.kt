@@ -311,8 +311,9 @@ class AddQuestionViewModel @Inject constructor(
         viewModelScope.launch {
             val state = _uiState.value
 
-            // Validation
-            if (state.subject.isBlank()) {
+            // Validation - trim whitespace
+            val subject = state.subject.trim()
+            if (subject.isBlank()) {
                 _events.emit(AddQuestionEvent.ShowError("请输入科目"))
                 return@launch
             }
@@ -328,7 +329,7 @@ class AddQuestionViewModel @Inject constructor(
                     userId = currentUserId,
                     imageId = imageId,
                     stage = state.stage,
-                    subject = state.subject,
+                    subject = subject,
                     errorReason = state.errorReason,
                     source = state.source.ifBlank { null },
                     questionType = state.questionType,

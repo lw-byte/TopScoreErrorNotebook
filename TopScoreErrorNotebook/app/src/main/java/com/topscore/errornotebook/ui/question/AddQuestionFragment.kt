@@ -136,6 +136,28 @@ class AddQuestionFragment : Fragment() {
             viewModel.updateStage(SubjectStage.entries[position])
         }
 
+        // Subject dropdown with common subjects
+        val subjects = listOf(
+            getString(R.string.subject_math),
+            getString(R.string.subject_chinese),
+            getString(R.string.subject_english),
+            getString(R.string.subject_physics),
+            getString(R.string.subject_chemistry),
+            getString(R.string.subject_biology),
+            getString(R.string.subject_politics),
+            getString(R.string.subject_history),
+            getString(R.string.subject_geography)
+        )
+        val subjectAdapter = ArrayAdapter(
+            requireContext(),
+            android.R.layout.simple_dropdown_item_1line,
+            subjects
+        )
+        binding.etSubject.setAdapter(subjectAdapter)
+        binding.etSubject.setOnItemClickListener { _, _, position, _ ->
+            viewModel.updateSubject(subjects[position])
+        }
+
         // Error reason spinner
         val reasonAdapter = ArrayAdapter(
             requireContext(),
