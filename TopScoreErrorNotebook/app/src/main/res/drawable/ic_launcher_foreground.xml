@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Background circle area is 72x72 centered in 108x108 -->
+    <!-- Book/Notebook icon representing error collection -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,30 L74,35 L74,75 L54,70 L34,75 L34,35 Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,30 L54,70"/>
+    <path
+        android:fillColor="#2D5A4A"
+        android:pathData="M38,40 L50,37 L50,63 L38,66 Z"/>
+    <path
+        android:fillColor="#C75450"
+        android:pathData="M58,37 L70,40 L70,66 L58,63 Z"/>
+    <path
+        android:fillColor="#2D5A4A"
+        android:pathData="M44,45 L50,43 L50,55 L44,57 Z"/>
+</vector>

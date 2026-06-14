@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.TopScoreErrorNotebook" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <!-- Primary brand color -->
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_dark</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+
+        <!-- Secondary brand color -->
+        <item name="colorSecondary">@color/accent</item>
+        <item name="colorSecondaryVariant">@color/accent_light</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+
+        <!-- Background -->
+        <item name="android:colorBackground">@color/background</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/ink</item>
+
+        <!-- Status bar -->
+        <item name="android:statusBarColor">@color/status_bar</item>
+        <item name="android:navigationBarColor">@color/surface</item>
+
+        <!-- Text colors -->
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:textColorHint">@color/text_hint</item>
+
+        <!-- Component styles -->
+        <item name="bottomNavigationStyle">@style/Widget.TopScore.BottomNavigation</item>
+        <item name="textInputStyle">@style/Widget.TopScore.TextInputLayout</item>
+    </style>
+
+    <!-- Bottom Navigation Style -->
+    <style name="Widget.TopScore.BottomNavigation" parent="Widget.MaterialComponents.BottomNavigationView.Colored">
+        <item name="backgroundTint">@color/surface</item>
+        <item name="itemIconTint">@color/bottom_nav_color</item>
+        <item name="itemTextColor">@color/bottom_nav_color</item>
+        <item name="labelVisibilityMode">labeled</item>
+    </style>
+
+    <!-- TextInputLayout Style -->
+    <style name="Widget.TopScore.TextInputLayout" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="boxStrokeColor">@color/text_input_stroke</item>
+        <item name="hintTextColor">@color/primary</item>
+    </style>
+
+    <!-- Button Styles -->
+    <style name="Widget.TopScore.Button.Primary" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">@color/primary</item>
+        <item name="android:textColor">@android:color/white</item>
+        <item name="cornerRadius">12dp</item>
+    </style>
+
+    <style name="Widget.TopScore.Button.Secondary" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="strokeColor">@color/primary</item>
+        <item name="android:textColor">@color/primary</item>
+        <item name="cornerRadius">12dp</item>
+    </style>
+
+    <style name="Widget.TopScore.Button.Text" parent="Widget.MaterialComponents.Button.TextButton">
+        <item name="android:textColor">@color/primary</item>
+    </style>
+
+    <!-- Card Style -->
+    <style name="Widget.TopScore.Card" parent="Widget.MaterialComponents.CardView">
+        <item name="cardCornerRadius">12dp</item>
+        <item name="cardElevation">2dp</item>
+        <item name="cardBackgroundColor">@color/surface</item>
+    </style>
+
+    <!-- Tag/Chip Style -->
+    <style name="Widget.TopScore.Chip.Filter" parent="Widget.MaterialComponents.Chip.Filter">
+        <item name="chipCornerRadius">20dp</item>
+        <item name="checkedIconVisible">false</item>
+    </style>
+</resources>

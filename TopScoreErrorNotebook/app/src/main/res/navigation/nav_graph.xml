@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/homeFragment">
+
+    <fragment
+        android:id="@+id/homeFragment"
+        android:name="com.topscore.errornotebook.ui.home.HomeFragment"
+        android:label="@string/home_welcome">
+        <action
+            android:id="@+id/action_home_to_questionDetail"
+            app:destination="@id/questionDetailFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/questionListFragment"
+        android:name="com.topscore.errornotebook.ui.question.QuestionListFragment"
+        android:label="@string/question_list_title">
+        <action
+            android:id="@+id/action_questionList_to_questionDetail"
+            app:destination="@id/questionDetailFragment" />
+        <action
+            android:id="@+id/action_questionList_to_export"
+            app:destination="@id/exportFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/addQuestionFragment"
+        android:name="com.topscore.errornotebook.ui.question.AddQuestionFragment"
+        android:label="@string/add_question_title">
+        <action
+            android:id="@+id/action_addQuestion_to_questionList"
+            app:destination="@id/questionListFragment"
+            app:popUpTo="@id/questionListFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/questionDetailFragment"
+        android:name="com.topscore.errornotebook.ui.question.QuestionDetailFragment"
+        android:label="@string/question_detail_title">
+        <argument
+            android:name="questionId"
+            app:argType="long" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/exportFragment"
+        android:name="com.topscore.errornotebook.ui.export.ExportFragment"
+        android:label="@string/export_title">
+        <argument
+            android:name="questionIds"
+            app:argType="long[]" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/profileFragment"
+        android:name="com.topscore.errornotebook.ui.profile.ProfileFragment"
+        android:label="@string/profile_title">
+        <action
+            android:id="@+id/action_profile_to_tagManagement"
+            app:destination="@id/tagManagementFragment" />
+        <action
+            android:id="@+id/action_profile_to_login"
+            app:destination="@id/loginFragment"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/loginFragment"
+        android:name="com.topscore.errornotebook.ui.auth.LoginFragment"
+        android:label="@string/login_title">
+        <action
+            android:id="@+id/action_login_to_home"
+            app:destination="@id/homeFragment"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/tagManagementFragment"
+        android:name="com.topscore.errornotebook.ui.profile.TagManagementFragment"
+        android:label="@string/my_tags" />
+
+</navigation>

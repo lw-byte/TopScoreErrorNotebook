@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">状元错题集</string>
+
+    <!-- Login -->
+    <string name="login_title">状元错题集</string>
+    <string name="login_subtitle">拍照导入 · 智能识别</string>
+    <string name="phone_hint">请输入手机号</string>
+    <string name="code_hint">验证码</string>
+    <string name="verify_code_hint">验证码</string>
+    <string name="get_verify_code">获取验证码</string>
+    <string name="get_code">获取验证码</string>
+    <string name="countdown_format">%d秒</string>
+    <string name="login">登录</string>
+    <string name="login_agreement">登录即表示同意《用户协议》</string>
+    <string name="terms_notice">登录即表示同意《用户协议》和《隐私政策》</string>
+    <string name="sms_code_sent">验证码已发送</string>
+    <string name="login_success">登录成功</string>
+
+    <!-- Home -->
+    <string name="home_welcome">欢迎回来，%s</string>
+    <string name="home_error_count">错题</string>
+    <string name="home_in_progress">进行中</string>
+    <string name="home_mastered">已掌握</string>
+    <string name="home_today">今日</string>
+    <string name="home_recent">最近添加</string>
+    <string name="home_empty">还没有错题，点击下方 + 拍照添加第一道吧</string>
+
+    <!-- Question List -->
+    <string name="question_list_title">我的错题</string>
+    <string name="search_hint">搜索题目内容…</string>
+    <string name="filter">筛选</string>
+    <string name="filter_stage">学段</string>
+    <string name="filter_error_reason">错因</string>
+    <string name="filter_all">全部</string>
+    <string name="export">导出</string>
+    <string name="selected_count">已选中 %d 道错题</string>
+
+    <!-- Add Question -->
+    <string name="add_question_title">添加错题</string>
+    <string name="select_source">请选择图片来源</string>
+    <string name="camera_import">拍照导入</string>
+    <string name="album_import">相册选择</string>
+    <string name="camera_tip">拍摄小贴士</string>
+    <string name="camera_tip_content">• 确保题目完整入框\n• 光线充足，避免阴影\n• 手写答案请单独拍摄</string>
+    <string name="ocr_recognizing">正在识别…</string>
+    <string name="confirm_result">确认题目</string>
+    <string name="retake">重新拍摄</string>
+    <string name="use_result">使用此结果</string>
+    <string name="fill_info">补充信息</string>
+    <string name="save_question">保存错题</string>
+
+    <!-- Question Detail -->
+    <string name="question_detail_title">题目详情</string>
+    <string name="question_label">题目</string>
+    <string name="my_answer">我的答案</string>
+    <string name="correct_answer">正确答案</string>
+    <string name="analysis">解析</string>
+    <string name="error_time">错误时间</string>
+
+    <!-- Tag Management -->
+    <string name="tag_management">标签管理</string>
+    <string name="tags">标签</string>
+    <string name="enter_tag_name">输入标签名称</string>
+    <string name="no_tags_yet">暂无标签</string>
+    <string name="add_tag">添加标签</string>
+    <string name="delete_tag">删除标签</string>
+
+    <!-- Profile -->
+    <string name="profile_title">我的</string>
+    <string name="sync_status">云端同步</string>
+    <string name="last_sync">上次同步：%s</string>
+    <string name="sync_now">立即同步</string>
+    <string name="my_tags">我的标签</string>
+    <string name="learning_stats">学习统计</string>
+    <string name="account_security">账号与安全</string>
+    <string name="dark_mode">深色模式</string>
+    <string name="about_us">关于我们</string>
+    <string name="logout">退出登录</string>
+    <string name="avatar">头像</string>
+
+    <!-- Export -->
+    <string name="export_title">导出错题</string>
+    <string name="print_content">打印内容</string>
+    <string name="question_content">题目正文</string>
+    <string name="correct_answer_content">正确答案</string>
+    <string name="notes_content">解析/笔记</string>
+    <string name="source_info">来源信息</string>
+    <string name="error_reason_tag">错因标签</string>
+    <string name="layout_settings">排版设置</string>
+    <string name="answer_placement">答案放置</string>
+    <string name="separate_page">另起一页（背面）</string>
+    <string name="interleaved">穿插在题后</string>
+    <string name="page_orientation">纸张方向</string>
+    <string name="portrait">纵向</string>
+    <string name="landscape">横向</string>
+    <string name="spacing">题目间留白</string>
+    <string name="font_size">字体大小</string>
+    <string name="print_preview">打印预览</string>
+    <string name="export_word_pdf">导出 Word/PDF</string>
+    <string name="direct_print">直接打印</string>
+
+    <!-- Common -->
+    <string name="cancel">取消</string>
+    <string name="confirm">确认</string>
+    <string name="delete">删除</string>
+    <string name="edit">编辑</string>
+    <string name="retry">重试</string>
+    <string name="loading">加载中…</string>
+    <string name="empty">暂无数据</string>
+    <string name="error">出错了</string>
+    <string name="network_error">网络异常</string>
+    <string name="offline_mode">离线模式</string>
+    <string name="sync_in_progress">同步中…</string>
+    <string name="sync_success">同步成功</string>
+    <string name="delete_confirm">确定要删除吗？</string>
+
+    <!-- Stage -->
+    <string name="stage_primary">小学</string>
+    <string name="stage_middle">初中</string>
+    <string name="stage_high">高中</string>
+
+    <!-- Error Reason -->
+    <string name="error_misread">审题不清</string>
+    <string name="error_calc">计算错误</string>
+    <string name="error_concept">概念模糊</string>
+    <string name="error_knowledge">知识点遗漏</string>
+    <string name="error_careless">粗心大意</string>
+    <string name="error_other">其他</string>
+
+    <!-- Question Type -->
+    <string name="type_choice">选择题</string>
+    <string name="type_fill_blank">填空题</string>
+    <string name="type_solution">解答题</string>
+    <string name="type_proof">证明题</string>
+    <string name="type_other">其他</string>
+</resources>

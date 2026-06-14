@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    app:cardBackgroundColor="#FFFFFF"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="1dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="12dp">
+
+        <View
+            android:id="@+id/viewTagColor"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:background="@drawable/bg_tag_color"
+            tools:background="@color/primary" />
+
+        <TextView
+            android:id="@+id/tvTagName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:textColor="#1A1A1A"
+            android:textSize="16sp"
+            tools:text="Math" />
+
+        <ImageButton
+            android:id="@+id/btnDeleteTag"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/delete_tag"
+            android:src="@drawable/ic_delete"
+            android:tint="@color/accent" />
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary Colors - 墨绿（守信、专注、成长） -->
+    <color name="primary">#2D5A4A</color>
+    <color name="primary_light">#3D7A64</color>
+    <color name="primary_dark">#1D3A32</color>
+
+    <!-- Accent Colors - 朱砂红（活力、成就、标记） -->
+    <color name="accent">#C75450</color>
+    <color name="accent_light">#E86B67</color>
+    <color name="accent_pale">#FAF0EF</color>
+
+    <!-- Neutral Colors - 宣纸色系 -->
+    <color name="paper">#FAF7F2</color>
+    <color name="paper_dark">#F0EBE3</color>
+    <color name="ink">#2C2C2C</color>
+    <color name="ink_light">#6B6B6B</color>
+    <color name="ink_faint">#A8A8A8</color>
+
+    <!-- Functional Colors -->
+    <color name="success">#3D8B6E</color>
+    <color name="warning">#D4864A</color>
+    <color name="error">#C75450</color>
+    <color name="info">#5A7FA8</color>
+
+    <!-- Background Colors -->
+    <color name="background">#FAF7F2</color>
+    <color name="surface">#FFFFFF</color>
+
+    <!-- Text Colors -->
+    <color name="text_primary">#2C2C2C</color>
+    <color name="text_secondary">#6B6B6B</color>
+    <color name="text_hint">#A8A8A8</color>
+
+    <!-- Divider -->
+    <color name="divider">#E0E0E0</color>
+
+    <!-- Status Bar -->
+    <color name="status_bar">#1D3A32</color>
+</resources>
