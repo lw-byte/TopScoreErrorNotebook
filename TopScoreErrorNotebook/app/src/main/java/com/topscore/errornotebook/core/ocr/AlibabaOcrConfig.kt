@@ -16,8 +16,8 @@ package com.topscore.errornotebook.core.ocr
 object AlibabaOcrConfig {
     // TODO: Replace with actual AccessKey credentials
     // Get your AccessKey from: https://ram.console.aliyun.com/manage/ak
-    const val ACCESS_KEY_ID = "YOUR_ACCESS_KEY_ID_PLACEHOLDER"
-    const val ACCESS_KEY_SECRET = "YOUR_ACCESS_KEY_SECRET_PLACEHOLDER"
+    const val ACCESS_KEY_ID = "LTAI5t7XWm8ymDJm4Mra9f9f"
+    const val ACCESS_KEY_SECRET = "CEJkOtr9JUUB8wfgb9C8OHNgIuIRHd"
 
     // OCR API Endpoint for SDK
     // Use the region-specific endpoint for the OCR API

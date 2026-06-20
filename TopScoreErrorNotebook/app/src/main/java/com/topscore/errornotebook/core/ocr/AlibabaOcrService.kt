@@ -218,12 +218,25 @@ class AlibabaOcrService @Inject constructor() {
         try {
             val dataJson = JSONObject(dataJsonStr)
 
-            // Extract prism_wordsInfo for structured text with line breaks
+            // Extract content field for question text
+            val content = dataJson.optString("content", "")
+
+            // Extract prism_wordsInfo for confidence and position info
             val prismWordsInfo = dataJson.optJSONArray("prism_wordsInfo")
             if (prismWordsInfo != null && prismWordsInfo.length() > 0) {
-                Logger.OCR.d("Found ${prismWordsInfo.length()} word blocks, building structured text")
+                Logger.OCR.d("Found ${prismWordsInfo.length()} word blocks in prism_wordsInfo")
 
-                // Parse word blocks with position info
+                // Calculate confidence from prism_wordsInfo
+                for (i in 0 until prismWordsInfo.length()) {
+                    val wordInfo = prismWordsInfo.getJSONObject(i)
+                    val prob = wordInfo.optDouble("prob", 0.0)
+                    if (prob > 0) {
+                        totalProbability += prob
+                        count++
+                    }
+                }
+
+                // Try to build structured text from prism_wordsInfo
                 val words = mutableListOf<WordBlock>()
                 for (i in 0 until prismWordsInfo.length()) {
                     val wordInfo = prismWordsInfo.getJSONObject(i)
@@ -235,59 +248,64 @@ class AlibabaOcrService @Inject constructor() {
                     if (word.isNotBlank()) {
                         words.add(WordBlock(word, x, y, prob))
                     }
-                    if (prob > 0) {
-                        totalProbability += prob
-                        count++
-                    }
                 }
 
-                // Sort words by y position (line), then x position
-                words.sortWith(compareBy({ it.y }, { it.x }))
+                // Only use prism_wordsInfo if we have enough words with valid positions
+                if (words.size >= 3) {
+                    Logger.OCR.d("Building structured text from ${words.size} word blocks")
 
-                // Group words into lines based on y position (threshold: 30 pixels)
-                val lineThreshold = 30
-                val lines = mutableListOf<List<WordBlock>>()
-                var currentLine = mutableListOf<WordBlock>()
-                var lastY = Int.MIN_VALUE
+                    // Sort words by y position (line), then x position
+                    words.sortWith(compareBy({ it.y }, { it.x }))
 
-                for (word in words) {
-                    if (currentLine.isEmpty() || kotlin.math.abs(word.y - lastY) <= lineThreshold) {
-                        currentLine.add(word)
-                        lastY = word.y
-                    } else {
+                    // Group words into lines based on y position (threshold: 30 pixels)
+                    val lineThreshold = 30
+                    val lines = mutableListOf<List<WordBlock>>()
+                    var currentLine = mutableListOf<WordBlock>()
+                    var lastY = Int.MIN_VALUE
+
+                    for (word in words) {
+                        if (currentLine.isEmpty() || kotlin.math.abs(word.y - lastY) <= lineThreshold) {
+                            currentLine.add(word)
+                            lastY = word.y
+                        } else {
+                            lines.add(currentLine)
+                            currentLine = mutableListOf(word)
+                            lastY = word.y
+                        }
+                    }
+                    if (currentLine.isNotEmpty()) {
                         lines.add(currentLine)
-                        currentLine = mutableListOf(word)
-                        lastY = word.y
                     }
-                }
-                if (currentLine.isNotEmpty()) {
-                    lines.add(currentLine)
-                }
 
-                // Build text with line breaks
-                for ((lineIndex, line) in lines.withIndex()) {
-                    val lineText = line.joinToString(" ") { it.word }
-                    text.append(lineText)
-                    if (lineIndex < lines.size - 1) {
-                        text.append("\n")
+                    // Build text with line breaks
+                    for ((lineIndex, line) in lines.withIndex()) {
+                        val lineText = line.joinToString("") { it.word }
+                        // Skip lines that look like noise (too short or special characters only)
+                        if (lineText.length > 1 && !lineText.all { it in " \n\t" }) {
+                            text.append(lineText.trim())
+                            if (lineIndex < lines.size - 1) {
+                                text.append("\n")
+                            }
+                        }
                     }
-                }
 
-                Logger.OCR.d("Built ${lines.size} lines from ${words.size} words")
+                    Logger.OCR.d("Built ${lines.size} lines from ${words.size} words")
+                } else {
+                    // Not enough words with positions, use content field with smart splitting
+                    Logger.OCR.d("Not enough word blocks, using content field with smart splitting")
+                    buildTextFromContent(content, text)
+                }
             } else {
-                // Fallback: use content field directly
-                val content = dataJson.optString("content", "")
-                if (content.isNotEmpty()) {
-                    Logger.OCR.d("Found content, length: ${content.length}")
-                    text.append(content)
-                }
+                // No prism_wordsInfo, use content field with smart splitting
+                Logger.OCR.d("No prism_wordsInfo found, using content field")
+                buildTextFromContent(content, text)
             }
         } catch (e: Exception) {
             Logger.OCR.e("Failed to parse JSON data: ${e.message}")
             // Fallback: try to extract content manually
             val content = extractJsonStringField(dataJsonStr, "content")
             if (content.isNotEmpty()) {
-                text.append(content)
+                buildTextFromContent(content, text)
             }
         }
 
@@ -301,6 +319,104 @@ class AlibabaOcrService @Inject constructor() {
             handwritingRegions = null,
             confidence = avgProbability.toFloat()
         )
+    }
+
+    /**
+     * Build formatted text from content field
+     * Splits by question numbers like (1), (2), (3) etc.
+     * Filters out noise content
+     */
+    private fun buildTextFromContent(content: String, text: StringBuilder) {
+        if (content.isEmpty()) return
+
+        // Clean up the content - replace LaTeX escape sequences with readable text
+        var cleaned = content
+            .replace("\\left", "")
+            .replace("\\right", "")
+            .replace("\\frac", "/")
+            .replace("\\cdot", "·")
+            .replace("\\times", "×")
+            .replace("\\div", "÷")
+            .replace("\\sqrt", "√")
+            .replace("\\pm", "±")
+            .replace("\\leq", "≤")
+            .replace("\\geq", "≥")
+            .replace("\\neq", "≠")
+            .replace("\\infty", "∞")
+            .replace("\\circ", "°")
+            .replace("\\%", "%")
+            .replace("\\$", "$")
+            .replace("\\left(", "(")
+            .replace("\\right)", ")")
+            .replace("\\'", "'")
+            .replace("\\\"", "\"")
+            .replace("\\\\", "\\")
+            .replace("\\n", "\n")
+            .replace("{", "")
+            .replace("}", "")
+            .replace("  ", " ")
+            .trim()
+
+        Logger.OCR.d("Cleaned content: ${cleaned.take(100)}...")
+
+        // Pattern to match question numbers like (1), (2), (1)(2) etc.
+        // Also matches patterns like 1. 2. 3. at the start
+        val questionPattern = Regex("""\(\d+\)|\d+\.\s*(?=[A-Z(])""")
+        val matches = questionPattern.findAll(cleaned)
+
+        if (matches.any()) {
+            // Split by question numbers
+            val parts = mutableListOf<String>()
+            var lastIndex = 0
+
+            for (match in matches) {
+                // Skip if this match is at the very beginning
+                if (match.range.first > 0 && match.range.first < 3) {
+                    // Keep everything from start
+                    parts.add(cleaned.substring(0, match.range.last + 1))
+                    lastIndex = match.range.last + 1
+                } else if (match.range.first >= 3) {
+                    // Add content before this match as previous question's continuation
+                    val beforeText = cleaned.substring(lastIndex, match.range.first).trim()
+                    if (beforeText.isNotEmpty()) {
+                        parts.add(beforeText)
+                    }
+                    // Skip content that looks like path/noise (contains \ or /)
+                    val segment = cleaned.substring(match.range.first, match.range.last + 1)
+                    if (!segment.contains("\\") && !segment.contains("/test-")) {
+                        parts.add(segment)
+                    }
+                    lastIndex = match.range.last + 1
+                }
+            }
+
+            // Add remaining content
+            if (lastIndex < cleaned.length) {
+                val remaining = cleaned.substring(lastIndex).trim()
+                if (remaining.isNotEmpty() && remaining.length > 2) {
+                    parts.add(remaining)
+                }
+            }
+
+            // Filter out noise parts (containing file paths, very short, etc.)
+            val validParts = parts.filter { part ->
+                part.isNotBlank() &&
+                !part.contains("\\test-") &&
+                !part.contains(".png") &&
+                !part.contains(".jpg") &&
+                !part.contains(".jpeg") &&
+                part.length > 2
+            }
+
+            // Join with double newlines between questions
+            text.append(validParts.joinToString("\n\n"))
+
+            Logger.OCR.d("Built ${validParts.size} question parts from content")
+        } else {
+            // No question numbers found, just use cleaned content as-is with single newlines
+            cleaned = cleaned.replace(Regex("""\s{2,}"""), "\n")
+            text.append(cleaned)
+        }
     }
 
     /**
