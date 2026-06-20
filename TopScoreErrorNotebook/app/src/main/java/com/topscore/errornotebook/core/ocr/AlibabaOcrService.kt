@@ -167,6 +167,16 @@ class AlibabaOcrService @Inject constructor() {
     }
 
     /**
+     * Word block data class for structured text parsing
+     */
+    private data class WordBlock(
+        val word: String,
+        val x: Int,
+        val y: Int,
+        val prob: Double
+    )
+
+    /**
      * Parse Alibaba OCR SDK response to OcrResult
      */
     private fun parseOcrResponse(response: RecognizeEduQuestionOcrResponse): OcrResult {
@@ -208,24 +218,68 @@ class AlibabaOcrService @Inject constructor() {
         try {
             val dataJson = JSONObject(dataJsonStr)
 
-            // Extract content field
-            val content = dataJson.optString("content", "")
-            if (content.isNotEmpty()) {
-                Logger.OCR.d("Found content, length: ${content.length}")
-                text.append(content)
-            }
-
-            // Extract prism_wordsInfo for confidence calculation
+            // Extract prism_wordsInfo for structured text with line breaks
             val prismWordsInfo = dataJson.optJSONArray("prism_wordsInfo")
             if (prismWordsInfo != null && prismWordsInfo.length() > 0) {
-                Logger.OCR.d("Found ${prismWordsInfo.length()} word blocks")
+                Logger.OCR.d("Found ${prismWordsInfo.length()} word blocks, building structured text")
+
+                // Parse word blocks with position info
+                val words = mutableListOf<WordBlock>()
                 for (i in 0 until prismWordsInfo.length()) {
                     val wordInfo = prismWordsInfo.getJSONObject(i)
+                    val word = wordInfo.optString("word", "")
+                    val x = wordInfo.optInt("x", 0)
+                    val y = wordInfo.optInt("y", 0)
                     val prob = wordInfo.optDouble("prob", 0.0)
+
+                    if (word.isNotBlank()) {
+                        words.add(WordBlock(word, x, y, prob))
+                    }
                     if (prob > 0) {
                         totalProbability += prob
                         count++
                     }
+                }
+
+                // Sort words by y position (line), then x position
+                words.sortWith(compareBy({ it.y }, { it.x }))
+
+                // Group words into lines based on y position (threshold: 30 pixels)
+                val lineThreshold = 30
+                val lines = mutableListOf<List<WordBlock>>()
+                var currentLine = mutableListOf<WordBlock>()
+                var lastY = Int.MIN_VALUE
+
+                for (word in words) {
+                    if (currentLine.isEmpty() || kotlin.math.abs(word.y - lastY) <= lineThreshold) {
+                        currentLine.add(word)
+                        lastY = word.y
+                    } else {
+                        lines.add(currentLine)
+                        currentLine = mutableListOf(word)
+                        lastY = word.y
+                    }
+                }
+                if (currentLine.isNotEmpty()) {
+                    lines.add(currentLine)
+                }
+
+                // Build text with line breaks
+                for ((lineIndex, line) in lines.withIndex()) {
+                    val lineText = line.joinToString(" ") { it.word }
+                    text.append(lineText)
+                    if (lineIndex < lines.size - 1) {
+                        text.append("\n")
+                    }
+                }
+
+                Logger.OCR.d("Built ${lines.size} lines from ${words.size} words")
+            } else {
+                // Fallback: use content field directly
+                val content = dataJson.optString("content", "")
+                if (content.isNotEmpty()) {
+                    Logger.OCR.d("Found content, length: ${content.length}")
+                    text.append(content)
                 }
             }
         } catch (e: Exception) {
@@ -296,21 +350,21 @@ class AlibabaOcrService @Inject constructor() {
     }
 
     /**
-     * Convert bitmap to byte array, ensuring size is under 4MB for API limit
+     * Convert bitmap to byte array, ensuring size is under 10MB for API limit
      */
     private fun bitmapToByteArray(bitmap: Bitmap): ByteArray {
-        val maxSizeBytes = 4 * 1024 * 1024  // 4MB limit
+        val maxSizeBytes = 10 * 1024 * 1024  // 10MB limit
 
         Logger.OCR.d("Original bitmap: ${bitmap.width}x${bitmap.height}")
 
-        // First, try JPEG compression at 85% quality
+        // First, try JPEG compression at 90% quality
         var outputStream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
         var byteArray = outputStream.toByteArray()
-        Logger.OCR.d("JPEG 85%: ${byteArray.size} bytes (${byteArray.size / 1024}KB)")
+        Logger.OCR.d("JPEG 90%: ${byteArray.size} bytes (${byteArray.size / 1024}KB)")
 
-        // If still over 4MB, progressively reduce quality
-        var quality = 85
+        // If still over 10MB, progressively reduce quality
+        var quality = 90
         while (byteArray.size > maxSizeBytes && quality > 20) {
             outputStream = ByteArrayOutputStream()
             quality -= 10
@@ -319,9 +373,9 @@ class AlibabaOcrService @Inject constructor() {
             Logger.OCR.d("JPEG $quality%: ${byteArray.size} bytes (${byteArray.size / 1024}KB)")
         }
 
-        // If still over 4MB, resize the image
+        // If still over 10MB, resize the image
         if (byteArray.size > maxSizeBytes) {
-            Logger.OCR.w("Image still over 4MB after compression, will resize")
+            Logger.OCR.w("Image still over 10MB after compression, will resize")
             var scale = 1.0
             var scaledBitmap = bitmap
             while (byteArray.size > maxSizeBytes && scale > 0.3) {
@@ -330,7 +384,7 @@ class AlibabaOcrService @Inject constructor() {
                 val newHeight = (bitmap.height * scale).toInt()
                 scaledBitmap = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
                 outputStream = ByteArrayOutputStream()
-                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
+                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
                 byteArray = outputStream.toByteArray()
                 Logger.OCR.d("Resized ${(scale * 100).toInt()}%: ${byteArray.size} bytes (${byteArray.size / 1024}KB)")
             }
