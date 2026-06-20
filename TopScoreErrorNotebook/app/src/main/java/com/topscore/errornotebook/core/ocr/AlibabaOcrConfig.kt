@@ -9,10 +9,9 @@ package com.topscore.errornotebook.core.ocr
  * 3. For production, use RAM user with appropriate OCR permissions
  *
  * For OCR service, enable the following in Alibaba Cloud Visual Intelligence Platform:
- * - General text OCR (通用文字识别)
- * - Handwritten text OCR (手写文字识别) - if needed
+ * - General text OCR (通用文字识别) - RecognizeCharacter API
  *
- * @see <a href="https://help.aliyun.com/zh/ocr/developer-reference/sdk-overview">Alibaba OCR SDK</a>
+ * @see <a href="https://help.aliyun.com/zh/viapi/use-cases/general-character-recognition">Alibaba OCR SDK Documentation</a>
  */
 object AlibabaOcrConfig {
     // TODO: Replace with actual AccessKey credentials
@@ -20,16 +19,8 @@ object AlibabaOcrConfig {
     const val ACCESS_KEY_ID = "YOUR_ACCESS_KEY_ID_PLACEHOLDER"
     const val ACCESS_KEY_SECRET = "YOUR_ACCESS_KEY_SECRET_PLACEHOLDER"
 
-    // OCR API Endpoint - use the appropriate region endpoint
+    // OCR API Endpoint for SDK
+    // Use the region-specific endpoint for the OCR API
     // Refer to: https://help.aliyun.com/zh/ocr/developer-reference/regions-and-endpoints
-    const val OCR_API_ENDPOINT = "https://ocr-api.cn-hangzhou.aliyuncs.com"
-
-    // Service version
-    const val SERVICE_VERSION = "2022-11-17"
-
-    // Action for general text recognition
-    const val ACTION_RECOGNIZE_TEXT = "RecognizeText"
-
-    // Product code for OCR
-    const val PRODUCT_CODE = "ocr"
+    const val OCR_API_ENDPOINT = "ocr-api.cn-hangzhou.aliyuncs.com"
 }

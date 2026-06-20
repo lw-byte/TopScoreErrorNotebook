@@ -15,6 +15,7 @@ import com.topscore.errornotebook.domain.model.QuestionStatus
 import com.topscore.errornotebook.domain.model.QuestionType
 import com.topscore.errornotebook.domain.model.SubjectStage
 import com.topscore.errornotebook.domain.model.SyncStatus
+import com.topscore.errornotebook.util.Logger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -98,16 +99,19 @@ class AddQuestionViewModel @Inject constructor(
     fun onEvent(event: AddQuestionEvent) {
         when (event) {
             is AddQuestionEvent.SaveSuccess -> {
+                Logger.Question.i("SaveSuccess event received")
                 viewModelScope.launch {
                     _events.emit(AddQuestionEvent.SaveSuccess)
                 }
             }
             is AddQuestionEvent.ShowError -> {
+                Logger.Question.e("ShowError: ${event.message}")
                 viewModelScope.launch {
                     _events.emit(AddQuestionEvent.ShowError(event.message))
                 }
             }
             is AddQuestionEvent.NavigateBack -> {
+                Logger.Question.i("NavigateBack event received")
                 viewModelScope.launch {
                     _events.emit(AddQuestionEvent.NavigateBack)
                 }
@@ -119,6 +123,7 @@ class AddQuestionViewModel @Inject constructor(
      * Select image source
      */
     fun selectSource(isCamera: Boolean) {
+        Logger.Question.i("selectSource: isCamera=$isCamera")
         if (isCamera) {
             _uiState.update { it.copy(currentStep = AddQuestionStep.CAMERA_CAPTURE) }
         } else {
@@ -131,6 +136,7 @@ class AddQuestionViewModel @Inject constructor(
      * Set image from camera capture
      */
     fun setImageFromCamera(imagePath: String) {
+        Logger.Question.i("setImageFromCamera: imagePath=$imagePath")
         _uiState.update {
             it.copy(
                 imagePath = imagePath,
@@ -144,6 +150,7 @@ class AddQuestionViewModel @Inject constructor(
      * Set image from album
      */
     fun setImageFromAlbum(uri: Uri) {
+        Logger.Question.i("setImageFromAlbum: uri=$uri")
         _uiState.update {
             it.copy(
                 imageUri = uri,
@@ -157,6 +164,7 @@ class AddQuestionViewModel @Inject constructor(
      * Perform OCR on the captured image using Alibaba OCR API
      */
     private fun performOcr(imagePath: String) {
+        Logger.OCR.i("Starting OCR for: $imagePath")
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
@@ -166,15 +174,20 @@ class AddQuestionViewModel @Inject constructor(
 
                 result.fold(
                     onSuccess = { ocrResult ->
+                        Logger.OCR.i("OCR success: confidence=${ocrResult.confidence}, textLength=${ocrResult.text.length}, errorCode=${ocrResult.errorCode}")
                         _uiState.update {
                             it.copy(
                                 ocrResult = ocrResult,
                                 isLoading = false,
-                                currentStep = AddQuestionStep.CONFIRM_RESULT
+                                currentStep = AddQuestionStep.CONFIRM_RESULT,
+                                errorMessage = if (ocrResult.errorCode != null) {
+                                    "识别失败:\n<Code>${ocrResult.errorCode}</Code>\n<Message>${ocrResult.errorMessage}</Message>"
+                                } else null
                             )
                         }
                     },
                     onFailure = { e ->
+                        Logger.OCR.w("OCR failed: ${e.message}, using mock data")
                         // Fallback to mock result if Alibaba OCR fails
                         // In production, you might want to handle this differently
                         val mockOcrResult = OcrResult(
@@ -182,7 +195,9 @@ class AddQuestionViewModel @Inject constructor(
                             isComplete = true,
                             hasHandwriting = false,
                             handwritingRegions = null,
-                            confidence = 0.95f
+                            confidence = 0.95f,
+                            errorCode = "ServiceUnavailable",
+                            errorMessage = e.message
                         )
                         _uiState.update {
                             it.copy(
@@ -195,6 +210,7 @@ class AddQuestionViewModel @Inject constructor(
                     }
                 )
             } catch (e: Exception) {
+                Logger.OCR.e("OCR exception: ${e.message}", e)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -210,6 +226,7 @@ class AddQuestionViewModel @Inject constructor(
      * Retake photo - go back to camera capture
      */
     fun retake() {
+        Logger.Question.i("retake")
         _uiState.update {
             it.copy(
                 imagePath = null,
@@ -224,6 +241,7 @@ class AddQuestionViewModel @Inject constructor(
      * Use OCR result and proceed to fill info
      */
     fun useOcrResult() {
+        Logger.Question.i("useOcrResult")
         _uiState.update { it.copy(currentStep = AddQuestionStep.FILL_INFO) }
     }
 
@@ -231,6 +249,7 @@ class AddQuestionViewModel @Inject constructor(
      * Edit OCR result - go back to confirm
      */
     fun editOcrResult() {
+        Logger.Question.i("editOcrResult")
         _uiState.update { it.copy(currentStep = AddQuestionStep.CONFIRM_RESULT) }
     }
 
@@ -313,7 +332,9 @@ class AddQuestionViewModel @Inject constructor(
 
             // Validation - trim whitespace
             val subject = state.subject.trim()
+            Logger.Question.i("saveQuestion: subject=$subject, stage=${state.stage}")
             if (subject.isBlank()) {
+                Logger.Question.w("saveQuestion failed: subject is blank")
                 _events.emit(AddQuestionEvent.ShowError("请输入科目"))
                 return@launch
             }
@@ -323,6 +344,7 @@ class AddQuestionViewModel @Inject constructor(
             try {
                 // Save image first
                 val imageId = saveImage(state)
+                Logger.Question.i("saveQuestion: imageId=$imageId")
 
                 // Create question
                 val question = Question(
@@ -343,11 +365,13 @@ class AddQuestionViewModel @Inject constructor(
                 )
 
                 questionDao.insertQuestion(question.toEntity())
+                Logger.Question.i("saveQuestion: question saved successfully")
 
                 _uiState.update { it.copy(isLoading = false) }
                 _events.emit(AddQuestionEvent.SaveSuccess)
 
             } catch (e: Exception) {
+                Logger.Question.e("saveQuestion failed: ${e.message}", e)
                 _uiState.update { it.copy(isLoading = false) }
                 _events.emit(AddQuestionEvent.ShowError(e.message ?: "保存失败"))
             }
@@ -368,6 +392,7 @@ class AddQuestionViewModel @Inject constructor(
      */
     fun goBack() {
         val currentStep = _uiState.value.currentStep
+        Logger.Question.i("goBack: currentStep=$currentStep")
         val previousStep = when (currentStep) {
             AddQuestionStep.SELECT_SOURCE -> null
             AddQuestionStep.CAMERA_CAPTURE -> AddQuestionStep.SELECT_SOURCE

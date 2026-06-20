@@ -80,7 +80,9 @@ data class OcrResult(
     val isComplete: Boolean,
     val hasHandwriting: Boolean,
     val handwritingRegions: List<Rect>? = null,
-    val confidence: Float
+    val confidence: Float,
+    val errorCode: String? = null,    // 错误码，如 "ClientError.413"
+    val errorMessage: String? = null   // 错误信息，如 "Request Entity Too Large"
 )
 
 /**

@@ -7,6 +7,7 @@ import com.topscore.errornotebook.core.database.toDomain
 import com.topscore.errornotebook.domain.model.Question
 import com.topscore.errornotebook.domain.model.QuestionFilter
 import com.topscore.errornotebook.domain.model.QuestionStatus
+import com.topscore.errornotebook.util.Logger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,6 +42,7 @@ class QuestionListViewModel @Inject constructor(
      * Handle UI events
      */
     fun onEvent(event: QuestionListEvent) {
+        Logger.Question.i("onEvent: $event")
         when (event) {
             is QuestionListEvent.LoadQuestions -> loadQuestions()
             is QuestionListEvent.ApplyFilter -> applyFilter(event.filter)
@@ -56,12 +58,14 @@ class QuestionListViewModel @Inject constructor(
     }
 
     private fun loadQuestions() {
+        Logger.Question.i("loadQuestions: starting")
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
                 questionDao.observeQuestions(userId, QuestionStatus.ACTIVE.name)
                     .collect { entities ->
                         val questions = entities.map { entity -> entity.toDomain() }
+                        Logger.Question.i("loadQuestions: loaded ${questions.size} questions")
                         _uiState.update { state ->
                             state.copy(
                                 isLoading = false,
@@ -71,25 +75,32 @@ class QuestionListViewModel @Inject constructor(
                         }
                     }
             } catch (e: Exception) {
+                Logger.Question.e("loadQuestions failed: ${e.message}", e)
                 _uiState.update { it.copy(isLoading = false, error = e.message) }
             }
         }
     }
 
     private fun applyFilter(filter: QuestionFilter) {
+        Logger.Question.i("applyFilter: stage=${filter.stage}, subject=${filter.subject}, errorReasons=${filter.errorReasons}")
         _uiState.update { state ->
+            val filtered = filterQuestions(state.questions, filter, state.searchKeyword)
+            Logger.Question.i("applyFilter: filtered ${filtered.size} questions")
             state.copy(
                 filter = filter,
-                filteredQuestions = filterQuestions(state.questions, filter, state.searchKeyword)
+                filteredQuestions = filtered
             )
         }
     }
 
     private fun search(keyword: String) {
+        Logger.Question.i("search: keyword=$keyword")
         _uiState.update { state ->
+            val filtered = filterQuestions(state.questions, state.filter, keyword)
+            Logger.Question.i("search: found ${filtered.size} results")
             state.copy(
                 searchKeyword = keyword,
-                filteredQuestions = filterQuestions(state.questions, state.filter, keyword)
+                filteredQuestions = filtered
             )
         }
     }
@@ -112,6 +123,7 @@ class QuestionListViewModel @Inject constructor(
     }
 
     private fun toggleSelection(questionId: Long) {
+        Logger.Question.i("toggleSelection: questionId=$questionId")
         _uiState.update { state ->
             val newSelectedIds = if (questionId in state.selectedIds) {
                 state.selectedIds - questionId
@@ -128,6 +140,7 @@ class QuestionListViewModel @Inject constructor(
     private fun deleteSelected() {
         viewModelScope.launch {
             val selectedIds = _uiState.value.selectedIds.toList()
+            Logger.Question.i("deleteSelected: ${selectedIds.size} questions")
             try {
                 questionDao.deleteQuestions(selectedIds)
                 _uiState.update { state ->
@@ -138,12 +151,14 @@ class QuestionListViewModel @Inject constructor(
                 }
                 _events.value = QuestionListEvent.ShowMessage("已删除 ${selectedIds.size} 道错题")
             } catch (e: Exception) {
+                Logger.Question.e("deleteSelected failed: ${e.message}", e)
                 _events.value = QuestionListEvent.ShowError(e.message ?: "删除失败")
             }
         }
     }
 
     private fun toggleSelectionMode() {
+        Logger.Question.i("toggleSelectionMode")
         _uiState.update { state ->
             state.copy(
                 isSelectionMode = !state.isSelectionMode,
@@ -153,6 +168,7 @@ class QuestionListViewModel @Inject constructor(
     }
 
     private fun clearSelection() {
+        Logger.Question.i("clearSelection")
         _uiState.update { state ->
             state.copy(
                 selectedIds = emptySet(),

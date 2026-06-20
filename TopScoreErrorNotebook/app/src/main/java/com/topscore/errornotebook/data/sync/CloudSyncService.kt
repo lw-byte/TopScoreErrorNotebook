@@ -9,6 +9,7 @@ import com.topscore.errornotebook.core.database.entity.QuestionImageEntity
 import com.topscore.errornotebook.core.database.toDomain
 import com.topscore.errornotebook.domain.model.Question
 import com.topscore.errornotebook.domain.model.SyncStatus
+import com.topscore.errornotebook.util.Logger
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -83,24 +84,29 @@ class CloudSyncService @Inject constructor(
      */
     suspend fun sync(authToken: String, mode: SyncMode = SyncMode.INCREMENTAL): SyncResult =
         withContext(Dispatchers.IO) {
+            Logger.Sync.i("sync started: mode=$mode")
             try {
                 // Step 1: Get pending local changes
                 val pendingQuestions = getPendingQuestions()
                 val pendingImages = getPendingImages()
+                Logger.Sync.i("sync: found ${pendingQuestions.size} questions, ${pendingImages.size} images to sync")
 
                 // Step 2: Prepare sync payload
                 val payload = buildSyncPayload(pendingQuestions, pendingImages, mode)
 
                 // Step 3: Send sync request to server
                 val response = sendSyncRequest(authToken, payload, mode)
+                Logger.Sync.i("sync: server response code=${response.code}")
 
                 // Step 4: Process server response
                 if (response.isSuccessful) {
                     val responseBody = response.body?.string() ?: "{}"
+                    Logger.Sync.i("sync: response body length=${responseBody.length}")
                     val syncResult = parseSyncResponse(responseBody)
 
                     // Step 5: Update local sync status
                     updateLocalSyncStatus(pendingQuestions, pendingImages, syncResult)
+                    Logger.Sync.i("sync completed: synced ${pendingQuestions.size} questions, ${pendingImages.size} images")
 
                     SyncResult(
                         success = true,
@@ -109,12 +115,15 @@ class CloudSyncService @Inject constructor(
                         conflicts = syncResult.conflicts
                     )
                 } else {
+                    val errorMsg = "Sync failed: ${response.code} - ${response.message}"
+                    Logger.Sync.e(errorMsg)
                     SyncResult(
                         success = false,
-                        errorMessage = "Sync failed: ${response.code} - ${response.message}"
+                        errorMessage = errorMsg
                     )
                 }
             } catch (e: Exception) {
+                Logger.Sync.e("sync exception: ${e.message}", e)
                 SyncResult(
                     success = false,
                     errorMessage = e.message ?: "Unknown sync error"

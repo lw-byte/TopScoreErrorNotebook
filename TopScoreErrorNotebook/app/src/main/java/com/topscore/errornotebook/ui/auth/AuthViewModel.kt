@@ -2,6 +2,7 @@ package com.topscore.errornotebook.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.topscore.errornotebook.util.Logger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -60,6 +61,7 @@ class AuthViewModel @Inject constructor() : ViewModel() {
     private var countdownJob: Job? = null
 
     fun onEvent(event: AuthEvent) {
+        Logger.Auth.i("onEvent: $event")
         when (event) {
             is AuthEvent.PhoneChanged -> {
                 _uiState.update { it.copy(phone = event.phone, errorMessage = null) }
@@ -81,19 +83,23 @@ class AuthViewModel @Inject constructor() : ViewModel() {
 
     private fun sendSmsCode() {
         val phone = _uiState.value.phone
+        Logger.Auth.i("sendSmsCode: phone=$phone")
 
         if (!PHONE_REGEX.matches(phone)) {
+            Logger.Auth.w("Invalid phone format: $phone")
             _uiState.update { it.copy(errorMessage = "请输入正确的手机号") }
             return
         }
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            Logger.Auth.i("Sending SMS code...")
 
             // Simulate API call - replace with actual SMS API
             delay(1000)
 
             _uiState.update { it.copy(isLoading = false) }
+            Logger.Auth.i("SMS code sent successfully")
             _effect.value = AuthEffect.SmsCodeSent
             startCountdown()
         }
@@ -102,24 +108,29 @@ class AuthViewModel @Inject constructor() : ViewModel() {
     private fun loginWithCode() {
         val phone = _uiState.value.phone
         val code = _uiState.value.code
+        Logger.Auth.i("loginWithCode: phone=$phone, code=$code")
 
         if (!PHONE_REGEX.matches(phone)) {
+            Logger.Auth.w("Invalid phone format: $phone")
             _uiState.update { it.copy(errorMessage = "请输入正确的手机号") }
             return
         }
 
         if (code.length < 4) {
+            Logger.Auth.w("Invalid code length: ${code.length}")
             _uiState.update { it.copy(errorMessage = "请输入4位验证码") }
             return
         }
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            Logger.Auth.i("Logging in...")
 
             // Simulate API call - replace with actual login API
             delay(1500)
 
             _uiState.update { it.copy(isLoading = false) }
+            Logger.Auth.i("Login successful")
             _effect.value = AuthEffect.LoginSuccess
         }
     }
