@@ -68,7 +68,7 @@ class AlibabaOcrService @Inject constructor() {
     }
 
     /**
-     * Recognize text from a bitmap
+     * Recognize text from a bitmap (JPEG compressed)
      */
     suspend fun recognizeText(bitmap: Bitmap): Result<OcrResult> = withContext(Dispatchers.IO) {
         Logger.OCR.d("recognizeText called with bitmap: ${bitmap.width}x${bitmap.height}")
@@ -78,6 +78,22 @@ class AlibabaOcrService @Inject constructor() {
             return@withContext callEduQuestionOcrApi(imageBytes)
         } catch (e: Exception) {
             Logger.OCR.e("Exception in recognizeText bitmap", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Recognize text from a bitmap in PNG format (no compression)
+     * Used for cropped question region for better OCR quality
+     */
+    suspend fun recognizeTextFromBitmapPng(bitmap: Bitmap): Result<OcrResult> = withContext(Dispatchers.IO) {
+        Logger.OCR.d("recognizeTextFromBitmapPng: bitmap=${bitmap.width}x${bitmap.height}")
+        try {
+            val imageBytes = bitmapToByteArrayPng(bitmap)
+            Logger.OCR.d("PNG bytes for OCR: ${imageBytes.size} bytes (${imageBytes.size / 1024}KB)")
+            return@withContext callEduQuestionOcrApi(imageBytes)
+        } catch (e: Exception) {
+            Logger.OCR.e("Exception in recognizeTextFromBitmapPng", e)
             Result.failure(e)
         }
     }
@@ -212,7 +228,7 @@ class AlibabaOcrService @Inject constructor() {
         }
 
         Logger.OCR.d("Found data JSON, length: ${dataJsonStr.length}")
-        Logger.OCR.d("Data JSON preview: ${dataJsonStr.take(200)}")
+        Logger.OCR.d("Data JSON preview: ${dataJsonStr.take(dataJsonStr.length)}")
 
         // Use JSONObject to properly parse JSON data
         try {
@@ -236,7 +252,7 @@ class AlibabaOcrService @Inject constructor() {
                     }
                 }
 
-                // Try to build structured text from prism_wordsInfo
+                // Collect words and positions from prism_wordsInfo
                 val words = mutableListOf<WordBlock>()
                 for (i in 0 until prismWordsInfo.length()) {
                     val wordInfo = prismWordsInfo.getJSONObject(i)
@@ -250,53 +266,33 @@ class AlibabaOcrService @Inject constructor() {
                     }
                 }
 
-                // Only use prism_wordsInfo if we have enough words with valid positions
-                if (words.size >= 3) {
-                    Logger.OCR.d("Building structured text from ${words.size} word blocks")
+                // Use content field as primary source for reading order
+                // prism_wordsInfo positions are used only for fill-in-blank underscores
+                if (content.isNotEmpty() && words.size >= 3) {
+                    Logger.OCR.d("Using content field for reading order, prism_wordsInfo for detail")
 
-                    // Sort words by y position (line), then x position
-                    words.sortWith(compareBy({ it.y }, { it.x }))
+                    // Build text from content field (preserves correct order)
+                    buildTextFromContent(content, text)
 
-                    // Group words into lines based on y position (threshold: 30 pixels)
-                    val lineThreshold = 30
-                    val lines = mutableListOf<List<WordBlock>>()
-                    var currentLine = mutableListOf<WordBlock>()
-                    var lastY = Int.MIN_VALUE
-
-                    for (word in words) {
-                        if (currentLine.isEmpty() || kotlin.math.abs(word.y - lastY) <= lineThreshold) {
-                            currentLine.add(word)
-                            lastY = word.y
-                        } else {
-                            lines.add(currentLine)
-                            currentLine = mutableListOf(word)
-                            lastY = word.y
-                        }
+                    // Also extract underscores/spaces from prism_wordsInfo that might be missing in content
+                    // These appear as very short words or spaces at specific x positions
+                    val fillBlanks = extractFillInBlanks(words)
+                    if (fillBlanks.isNotEmpty()) {
+                        Logger.OCR.d("Found ${fillBlanks.size} fill-in-blank markers from prism_wordsInfo")
+                        // Note: fill blanks are already included in content from OCR
+                        // This is for future enhancement if needed
                     }
-                    if (currentLine.isNotEmpty()) {
-                        lines.add(currentLine)
-                    }
-
-                    // Build text with line breaks
-                    for ((lineIndex, line) in lines.withIndex()) {
-                        val lineText = line.joinToString("") { it.word }
-                        // Skip lines that look like noise (too short or special characters only)
-                        if (lineText.length > 1 && !lineText.all { it in " \n\t" }) {
-                            text.append(lineText.trim())
-                            if (lineIndex < lines.size - 1) {
-                                text.append("\n")
-                            }
-                        }
-                    }
-
-                    Logger.OCR.d("Built ${lines.size} lines from ${words.size} words")
+                } else if (words.size >= 3) {
+                    // Fallback: use prism_wordsInfo positions when content is empty
+                    Logger.OCR.d("Building structured text from ${words.size} word blocks (fallback)")
+                    buildTextFromPrismWordsInfo(words, text)
                 } else {
-                    // Not enough words with positions, use content field with smart splitting
-                    Logger.OCR.d("Not enough word blocks, using content field with smart splitting")
+                    // Very few words, use content field
+                    Logger.OCR.d("Not enough word blocks, using content field")
                     buildTextFromContent(content, text)
                 }
             } else {
-                // No prism_wordsInfo, use content field with smart splitting
+                // No prism_wordsInfo, use content field directly
                 Logger.OCR.d("No prism_wordsInfo found, using content field")
                 buildTextFromContent(content, text)
             }
@@ -319,6 +315,83 @@ class AlibabaOcrService @Inject constructor() {
             handwritingRegions = null,
             confidence = avgProbability.toFloat()
         )
+    }
+
+    /**
+     * Build text from prism_wordsInfo using improved line detection
+     * Uses adaptive threshold based on y-position gaps rather than fixed threshold
+     */
+    private fun buildTextFromPrismWordsInfo(words: List<WordBlock>, text: StringBuilder) {
+        if (words.isEmpty()) return
+
+        // Sort words by y position (line), then x position
+        val sortedWords = words.sortedWith(compareBy({ it.y }, { it.x }))
+
+        // Detect line breaks using adaptive threshold
+        // Calculate gaps between consecutive y positions
+        val yPositions = sortedWords.map { it.y }.distinct().sorted()
+        val gaps = mutableListOf<Int>()
+        for (i in 1 until yPositions.size) {
+            gaps.add(yPositions[i] - yPositions[i - 1])
+        }
+
+        // Find the most common gap size (likely the normal line height)
+        val lineHeight = gaps.groupBy { it }.maxByOrNull { it.value.size }?.key ?: 30
+        Logger.OCR.d("Detected line height: $lineHeight from ${gaps.size} gaps")
+
+        // Use 1.5x line height as threshold for new line detection
+        val lineThreshold = (lineHeight * 1.5).toInt().coerceAtLeast(20)
+
+        val lines = mutableListOf<List<WordBlock>>()
+        var currentLine = mutableListOf<WordBlock>()
+        var lastY = Int.MIN_VALUE
+
+        for (word in sortedWords) {
+            if (currentLine.isEmpty()) {
+                currentLine.add(word)
+                lastY = word.y
+            } else {
+                val yDiff = word.y - lastY
+                if (yDiff <= lineThreshold) {
+                    currentLine.add(word)
+                    lastY = word.y
+                } else {
+                    // New line detected
+                    lines.add(currentLine.sortedBy { it.x }) // Sort by x within line
+                    currentLine = mutableListOf(word)
+                    lastY = word.y
+                }
+            }
+        }
+        if (currentLine.isNotEmpty()) {
+            lines.add(currentLine.sortedBy { it.x })
+        }
+
+        // Build text with line breaks
+        for ((lineIndex, line) in lines.withIndex()) {
+            val lineText = line.joinToString("") { it.word }
+            // Skip lines that look like noise (too short or special characters only)
+            if (lineText.length > 1 && !lineText.all { it in " \n\t" }) {
+                text.append(lineText.trim())
+                if (lineIndex < lines.size - 1) {
+                    text.append("\n")
+                }
+            }
+        }
+
+        Logger.OCR.d("Built ${lines.size} lines from ${words.size} words")
+    }
+
+    /**
+     * Extract fill-in-blank markers from prism_wordsInfo
+     * Looks for underscores or blank spaces that indicate answer fields
+     */
+    private fun extractFillInBlanks(words: List<WordBlock>): List<String> {
+        // Look for words that are underscores or very short (likely blank indicators)
+        return words.filter { word ->
+            val w = word.word
+            w.isNotBlank() && (w.all { it == '_' } || w.all { it == ' ' } || w.length <= 2)
+        }.map { it.word }
     }
 
     /**
@@ -359,46 +432,47 @@ class AlibabaOcrService @Inject constructor() {
 
         Logger.OCR.d("Cleaned content: ${cleaned.take(100)}...")
 
-        // Pattern to match question numbers like (1), (2), (1)(2) etc.
-        // Also matches patterns like 1. 2. 3. at the start
-        val questionPattern = Regex("""\(\d+\)|\d+\.\s*(?=[A-Z(])""")
+        // Pattern to match question numbers like (1), (2), 1、, 2、, 1., 2. etc.
+        // Handles: (1), 1、, 2、, 1. 2. (with space before next content)
+        val questionPattern = Regex("""\(\d+\)|\d+[、。.]|\d+\.\s*(?=[A-Z(])""")
         val matches = questionPattern.findAll(cleaned)
 
         if (matches.any()) {
-            // Split by question numbers
+            // Split by question numbers - improved logic
+            // Each match marks the START of a new question
             val parts = mutableListOf<String>()
-            var lastIndex = 0
+            val matchList = matches.toList()
 
-            for (match in matches) {
-                // Skip if this match is at the very beginning
-                if (match.range.first > 0 && match.range.first < 3) {
-                    // Keep everything from start
-                    parts.add(cleaned.substring(0, match.range.last + 1))
-                    lastIndex = match.range.last + 1
-                } else if (match.range.first >= 3) {
-                    // Add content before this match as previous question's continuation
-                    val beforeText = cleaned.substring(lastIndex, match.range.first).trim()
-                    if (beforeText.isNotEmpty()) {
-                        parts.add(beforeText)
+            // Add content before the first question number as header/intro
+            if (matchList.isNotEmpty()) {
+                val firstMatch = matchList.first()
+                if (firstMatch.range.first > 0) {
+                    val intro = cleaned.substring(0, firstMatch.range.first).trim()
+                    if (intro.isNotEmpty() && intro.length > 2 && !intro.contains("\\test-")) {
+                        parts.add(intro)
                     }
-                    // Skip content that looks like path/noise (contains \ or /)
-                    val segment = cleaned.substring(match.range.first, match.range.last + 1)
-                    if (!segment.contains("\\") && !segment.contains("/test-")) {
-                        parts.add(segment)
-                    }
-                    lastIndex = match.range.last + 1
                 }
             }
 
-            // Add remaining content
-            if (lastIndex < cleaned.length) {
-                val remaining = cleaned.substring(lastIndex).trim()
-                if (remaining.isNotEmpty() && remaining.length > 2) {
-                    parts.add(remaining)
+            // Process each question segment
+            for (i in matchList.indices) {
+                val match = matchList[i]
+                val nextMatch = if (i + 1 < matchList.size) matchList[i + 1] else null
+
+                // Extract content from this question number to the next
+                val contentStart = match.range.first
+                val contentEnd = nextMatch?.range?.first ?: cleaned.length
+                val questionContent = cleaned.substring(contentStart, contentEnd).trim()
+
+                if (questionContent.isNotEmpty() && questionContent.length > 1) {
+                    // Skip if it looks like noise
+                    if (!questionContent.contains("\\test-") && !questionContent.contains(".png")) {
+                        parts.add(questionContent)
+                    }
                 }
             }
 
-            // Filter out noise parts (containing file paths, very short, etc.)
+            // Filter out noise parts
             val validParts = parts.filter { part ->
                 part.isNotBlank() &&
                 !part.contains("\\test-") &&
@@ -408,8 +482,10 @@ class AlibabaOcrService @Inject constructor() {
                 part.length > 2
             }
 
-            // Join with double newlines between questions
+            // Join with double newlines between questions for clear separation
             text.append(validParts.joinToString("\n\n"))
+
+            Logger.OCR.d("Built ${validParts.size} question parts from content")
 
             Logger.OCR.d("Built ${validParts.size} question parts from content")
         } else {
@@ -510,6 +586,24 @@ class AlibabaOcrService @Inject constructor() {
         }
 
         Logger.OCR.d("Final image size: ${byteArray.size} bytes (${byteArray.size / 1024}KB, ${byteArray.size / (1024 * 1024)}MB)")
+        return byteArray
+    }
+
+    /**
+     * Convert bitmap to PNG byte array without compression
+     * Used for cropped question region to preserve quality
+     */
+    private fun bitmapToByteArrayPng(bitmap: Bitmap): ByteArray {
+        Logger.OCR.d("Converting bitmap to PNG: ${bitmap.width}x${bitmap.height}")
+
+        val outputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+        val byteArray = outputStream.toByteArray()
+
+        val kb = byteArray.size / 1024.0
+        val mb = kb / 1024.0
+        val sizeStr = if (mb >= 1) String.format("%.2fMB", mb) else String.format("%.1fKB", kb)
+        Logger.OCR.d("PNG cropped image: ${bitmap.width}x${bitmap.height} -> ${byteArray.size} bytes ($sizeStr)")
         return byteArray
     }
 }

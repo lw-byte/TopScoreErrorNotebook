@@ -2,6 +2,7 @@ package com.topscore.errornotebook.ui.question
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -45,9 +46,10 @@ import java.util.concurrent.Executors
  * Step-by-step flow for adding a new question:
  * 1. SELECT_SOURCE - Select image source (camera/album)
  * 2. CAMERA_CAPTURE - Camera capture
- * 3. OCR_RECOGNIZING - OCR progress
- * 4. CONFIRM_RESULT - Confirm OCR result
- * 5. FILL_INFO - Fill in question info form
+ * 3. SELECT_REGION - Select question region (crop)
+ * 4. OCR_RECOGNIZING - OCR progress
+ * 5. CONFIRM_RESULT - Confirm OCR result
+ * 6. FILL_INFO - Fill in question info form
  */
 @AndroidEntryPoint
 class AddQuestionFragment : Fragment() {
@@ -63,7 +65,22 @@ class AddQuestionFragment : Fragment() {
 
     // Gallery picker
     private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { viewModel.setImageFromAlbum(it) }
+        uri?.let {
+            // Load bitmap from URI and set for cropping
+            try {
+                val inputStream = requireContext().contentResolver.openInputStream(it)
+                val bitmap = BitmapFactory.decodeStream(inputStream)
+                inputStream?.close()
+                if (bitmap != null) {
+                    viewModel.setImageFromAlbum(it)
+                    viewModel.setCapturedBitmap(bitmap)
+                } else {
+                    Toast.makeText(requireContext(), "无法加载图片", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "图片加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     // Camera permission
@@ -104,6 +121,20 @@ class AddQuestionFragment : Fragment() {
 
         binding.cardAlbum.setOnClickListener {
             pickImage.launch("image/*")
+        }
+
+        // Step 3: Select Region
+        binding.btnCancelRegion.setOnClickListener {
+            viewModel.cancelCropRegion()
+        }
+
+        binding.btnConfirmRegion.setOnClickListener {
+            val cropRect = binding.cropSelectionView.getCropRect()
+            if (cropRect != null) {
+                viewModel.confirmCropRegion(cropRect)
+            } else {
+                Toast.makeText(requireContext(), "请先选择区域", Toast.LENGTH_SHORT).show()
+            }
         }
 
         // Step 4: Confirm result
@@ -322,6 +353,7 @@ class AddQuestionFragment : Fragment() {
         // Show/hide step views
         binding.stepSource.isVisible = state.currentStep == AddQuestionStep.SELECT_SOURCE
         binding.stepCamera.isVisible = state.currentStep == AddQuestionStep.CAMERA_CAPTURE
+        binding.stepSelectRegion.isVisible = state.currentStep == AddQuestionStep.SELECT_REGION
         binding.stepOcr.isVisible = state.currentStep == AddQuestionStep.OCR_RECOGNIZING
         binding.stepConfirmResult.isVisible = state.currentStep == AddQuestionStep.CONFIRM_RESULT
         binding.stepFillInfo.isVisible = state.currentStep == AddQuestionStep.FILL_INFO
@@ -335,7 +367,26 @@ class AddQuestionFragment : Fragment() {
             binding.btnCapture.setOnClickListener { takePhoto() }
         }
 
-        // Step 3: OCR Recognizing
+        // Step 3: Select Region - load bitmap into crop view
+        if (state.currentStep == AddQuestionStep.SELECT_REGION) {
+            // Release camera when entering crop step
+            val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
+            cameraProviderFuture.addListener({
+                try {
+                    val cameraProvider = cameraProviderFuture.get()
+                    cameraProvider.unbindAll()
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }, ContextCompat.getMainExecutor(requireContext()))
+
+            // Load bitmap into crop selection view
+            state.capturedBitmap?.let { bitmap ->
+                binding.cropSelectionView.setImageBitmap(bitmap)
+            }
+        }
+
+        // Step 4: OCR Recognizing
         if (state.currentStep == AddQuestionStep.OCR_RECOGNIZING) {
             // Camera is no longer needed, release
             val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
@@ -349,7 +400,7 @@ class AddQuestionFragment : Fragment() {
             }, ContextCompat.getMainExecutor(requireContext()))
         }
 
-        // Step 4: Confirm result
+        // Step 5: Confirm result
         if (state.currentStep == AddQuestionStep.CONFIRM_RESULT) {
             state.ocrResult?.let { ocr ->
                 binding.tvRecognizedText.text = ocr.text
@@ -359,7 +410,7 @@ class AddQuestionFragment : Fragment() {
             binding.tvErrorOcr.isVisible = state.errorMessage != null
         }
 
-        // Step 5: Fill info - populate form with existing values
+        // Step 6: Fill info - populate form with existing values
         if (state.currentStep == AddQuestionStep.FILL_INFO) {
             populateForm(state)
         }
@@ -374,11 +425,14 @@ class AddQuestionFragment : Fragment() {
             binding.stepIndicator5
         )
 
+        // Map steps to indicator indices
+        // SELECT_REGION shares indicator with OCR_RECOGNIZING (both part of "process" phase)
         val stepIndex = when (step) {
             AddQuestionStep.SELECT_SOURCE -> 0
             AddQuestionStep.CAMERA_CAPTURE -> 1
-            AddQuestionStep.OCR_RECOGNIZING -> 2
-            AddQuestionStep.CONFIRM_RESULT -> 3
+            AddQuestionStep.SELECT_REGION -> 2
+            AddQuestionStep.OCR_RECOGNIZING -> 3
+            AddQuestionStep.CONFIRM_RESULT -> 4
             AddQuestionStep.FILL_INFO -> 4
         }
 
@@ -390,6 +444,7 @@ class AddQuestionFragment : Fragment() {
         binding.tvStepTitle.text = when (step) {
             AddQuestionStep.SELECT_SOURCE -> getString(R.string.select_source)
             AddQuestionStep.CAMERA_CAPTURE -> getString(R.string.camera_import)
+            AddQuestionStep.SELECT_REGION -> getString(R.string.select_region)
             AddQuestionStep.OCR_RECOGNIZING -> getString(R.string.ocr_recognizing)
             AddQuestionStep.CONFIRM_RESULT -> getString(R.string.confirm_result)
             AddQuestionStep.FILL_INFO -> getString(R.string.fill_info)

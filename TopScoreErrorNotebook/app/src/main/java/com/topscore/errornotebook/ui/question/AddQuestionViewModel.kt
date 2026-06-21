@@ -1,5 +1,6 @@
 package com.topscore.errornotebook.ui.question
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.lifecycle.ViewModel
@@ -10,6 +11,7 @@ import com.topscore.errornotebook.core.database.toEntity
 import com.topscore.errornotebook.core.ocr.AlibabaOcrService
 import com.topscore.errornotebook.domain.model.ErrorReason
 import com.topscore.errornotebook.domain.model.OcrResult
+import com.topscore.errornotebook.domain.model.Rect
 import com.topscore.errornotebook.domain.model.Question
 import com.topscore.errornotebook.domain.model.QuestionStatus
 import com.topscore.errornotebook.domain.model.QuestionType
@@ -31,10 +33,11 @@ import javax.inject.Inject
  */
 enum class AddQuestionStep {
     SELECT_SOURCE,     // Step 1: Select image source (camera/album)
-    CAMERA_CAPTURE,   // Step 2: Camera capture
-    OCR_RECOGNIZING,   // Step 3: OCR recognizing
-    CONFIRM_RESULT,    // Step 4: Confirm OCR result
-    FILL_INFO          // Step 5: Fill in question info form
+    CAMERA_CAPTURE,    // Step 2: Camera capture
+    SELECT_REGION,     // Step 3: Select question region (crop)
+    OCR_RECOGNIZING,   // Step 4: OCR recognizing
+    CONFIRM_RESULT,    // Step 5: Confirm OCR result
+    FILL_INFO          // Step 6: Fill in question info form
 }
 
 /**
@@ -48,6 +51,9 @@ data class AddQuestionUiState(
     // Image capture
     val imagePath: String? = null,
     val imageUri: Uri? = null,
+
+    // Crop
+    val capturedBitmap: Bitmap? = null,  // Full captured image for cropping
 
     // OCR
     val ocrResult: OcrResult? = null,
@@ -133,31 +139,145 @@ class AddQuestionViewModel @Inject constructor(
     }
 
     /**
-     * Set image from camera capture
+     * Set image from camera capture and go to region selection
      */
     fun setImageFromCamera(imagePath: String) {
         Logger.Question.i("setImageFromCamera: imagePath=$imagePath")
+        val bitmap = BitmapFactory.decodeFile(imagePath)
         _uiState.update {
             it.copy(
                 imagePath = imagePath,
-                currentStep = AddQuestionStep.OCR_RECOGNIZING
+                capturedBitmap = bitmap,
+                currentStep = AddQuestionStep.SELECT_REGION
             )
         }
-        performOcr(imagePath)
     }
 
     /**
-     * Set image from album
+     * Set image from album and go to region selection
      */
     fun setImageFromAlbum(uri: Uri) {
         Logger.Question.i("setImageFromAlbum: uri=$uri")
+        // For album images, we need to load the bitmap from URI
+        // This will be handled in Fragment when entering SELECT_REGION step
         _uiState.update {
             it.copy(
                 imageUri = uri,
-                currentStep = AddQuestionStep.OCR_RECOGNIZING
+                currentStep = AddQuestionStep.SELECT_REGION
             )
         }
-        // OCR will be performed with URI
+    }
+
+    /**
+     * Set captured bitmap (loaded from URI or file path)
+     */
+    fun setCapturedBitmap(bitmap: Bitmap) {
+        Logger.Question.i("setCapturedBitmap: ${bitmap.width}x${bitmap.height}")
+        _uiState.update { it.copy(capturedBitmap = bitmap) }
+    }
+
+    /**
+     * Confirm crop region and perform OCR on cropped image
+     */
+    fun confirmCropRegion(cropRect: Rect) {
+        Logger.Question.i("confirmCropRegion: $cropRect")
+        val state = _uiState.value
+        val bitmap = state.capturedBitmap ?: run {
+            Logger.OCR.e("No captured bitmap available for cropping")
+            return
+        }
+
+        // Crop the bitmap
+        val x = cropRect.x.toInt().coerceIn(0, bitmap.width - 1)
+        val y = cropRect.y.toInt().coerceIn(0, bitmap.height - 1)
+        val w = cropRect.width.toInt().coerceIn(1, bitmap.width - x)
+        val h = cropRect.height.toInt().coerceIn(1, bitmap.height - y)
+
+        val croppedBitmap = Bitmap.createBitmap(bitmap, x, y, w, h)
+        Logger.Question.i("Cropped bitmap: ${croppedBitmap.width}x${croppedBitmap.height}")
+
+        _uiState.update {
+            it.copy(
+                currentStep = AddQuestionStep.OCR_RECOGNIZING,
+                capturedBitmap = null  // Clear full bitmap to free memory
+            )
+        }
+
+        performOcrFromBitmap(croppedBitmap)
+    }
+
+    /**
+     * Cancel crop and go back to camera capture
+     */
+    fun cancelCropRegion() {
+        Logger.Question.i("cancelCropRegion")
+        _uiState.update {
+            it.copy(
+                capturedBitmap = null,
+                currentStep = AddQuestionStep.CAMERA_CAPTURE
+            )
+        }
+    }
+
+    /**
+     * Perform OCR on cropped bitmap using PNG format
+     */
+    private fun performOcrFromBitmap(croppedBitmap: Bitmap) {
+        Logger.OCR.i("Starting OCR on cropped bitmap: ${croppedBitmap.width}x${croppedBitmap.height} (PNG)")
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
+            try {
+                // Call Alibaba OCR service with PNG format
+                val result = ocrService.recognizeTextFromBitmapPng(croppedBitmap)
+
+                result.fold(
+                    onSuccess = { ocrResult ->
+                        Logger.OCR.i("OCR success: confidence=${ocrResult.confidence}, textLength=${ocrResult.text.length}, errorCode=${ocrResult.errorCode}")
+                        _uiState.update {
+                            it.copy(
+                                ocrResult = ocrResult,
+                                isLoading = false,
+                                currentStep = AddQuestionStep.CONFIRM_RESULT,
+                                errorMessage = if (ocrResult.errorCode != null) {
+                                    "识别失败:\n<Code>${ocrResult.errorCode}</Code>\n<Message>${ocrResult.errorMessage}</Message>"
+                                } else null
+                            )
+                        }
+                    },
+                    onFailure = { e ->
+                        Logger.OCR.w("OCR failed: ${e.message}, using mock data")
+                        // Fallback to mock result if Alibaba OCR fails
+                        val mockOcrResult = OcrResult(
+                            text = "这是一道数学选择题。\n题目：下列哪个是正确的是？\nA. 1+1=2\nB. 1+1=3\nC. 1+1=4\nD. 1+1=5",
+                            isComplete = true,
+                            hasHandwriting = false,
+                            handwritingRegions = null,
+                            confidence = 0.95f,
+                            errorCode = "ServiceUnavailable",
+                            errorMessage = e.message
+                        )
+                        _uiState.update {
+                            it.copy(
+                                ocrResult = mockOcrResult,
+                                isLoading = false,
+                                currentStep = AddQuestionStep.CONFIRM_RESULT,
+                                errorMessage = "OCR识别服务暂不可用，已使用模拟数据：${e.message}"
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                Logger.OCR.e("OCR exception: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = e.message ?: "OCR识别失败",
+                        currentStep = AddQuestionStep.CONFIRM_RESULT
+                    )
+                }
+            }
+        }
     }
 
     /**
@@ -231,6 +351,7 @@ class AddQuestionViewModel @Inject constructor(
             it.copy(
                 imagePath = null,
                 imageUri = null,
+                capturedBitmap = null,
                 ocrResult = null,
                 currentStep = AddQuestionStep.CAMERA_CAPTURE
             )
@@ -381,6 +502,7 @@ class AddQuestionViewModel @Inject constructor(
     /**
      * Save image to database
      */
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun saveImage(state: AddQuestionUiState): Long {
         // In production, would upload image and get URL
         // For now, save local path reference
@@ -396,7 +518,8 @@ class AddQuestionViewModel @Inject constructor(
         val previousStep = when (currentStep) {
             AddQuestionStep.SELECT_SOURCE -> null
             AddQuestionStep.CAMERA_CAPTURE -> AddQuestionStep.SELECT_SOURCE
-            AddQuestionStep.OCR_RECOGNIZING -> AddQuestionStep.CAMERA_CAPTURE
+            AddQuestionStep.SELECT_REGION -> AddQuestionStep.CAMERA_CAPTURE
+            AddQuestionStep.OCR_RECOGNIZING -> AddQuestionStep.SELECT_REGION
             AddQuestionStep.CONFIRM_RESULT -> AddQuestionStep.OCR_RECOGNIZING
             AddQuestionStep.FILL_INFO -> AddQuestionStep.CONFIRM_RESULT
         }

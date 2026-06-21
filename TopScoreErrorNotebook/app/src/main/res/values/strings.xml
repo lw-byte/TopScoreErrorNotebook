@@ -55,6 +55,8 @@
     <string name="album_import">相册选择</string>
     <string name="camera_tip">拍摄小贴士</string>
     <string name="camera_tip_content">• 确保题目完整入框\n• 光线充足，避免阴影\n• 手写答案请单独拍摄</string>
+    <string name="select_region">选择区域</string>
+    <string name="confirm_region">确认区域</string>
     <string name="ocr_recognizing">正在识别…</string>
     <string name="confirm_result">确认题目</string>
     <string name="retake">重新拍摄</string>
