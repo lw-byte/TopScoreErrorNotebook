@@ -1,6 +1,6 @@
 # 状元错题集 Android 技术设计文档
 
-**文档版本**：v1.0  
+**文档版本**：v1.1  
 **创建日期**：2026/06/13  
 **作者**：AI 技术设计专家  
 **审阅人**：待定  
@@ -13,6 +13,7 @@
 | 版本 | 日期 | 修订人 | 修订内容 |
 |------|------|--------|---------|
 | v1.0 | 2026/06/13 | AI | 初始版本，基于 PRD V1.0 和交互设计稿 V1.0 生成 |
+| v1.1 | 2026/06/20 | AI | 新增错题区域选择（裁剪）功能；CropSelectionView 自定义视图文档；更新 AddQuestionStep 枚举（6步流程）；明确使用 recognizeEduQuestionOcrWithOptions 接口，PNG格式不压缩 |
 
 ---
 
@@ -473,8 +474,8 @@ enum class FontSize { SMALL, MEDIUM, LARGE }
 | `core:database` | Room 数据库、DAO、Migration | `AppDatabase`, 各 DAO |
 | `core:storage` | DataStore 封装、加密存储 | `PreferencesStorage`, `SecureStorage` |
 | `core:oss` | 阿里云 OSS 上传、下载 | `OssClient`, `OssUploader` |
-| `core:ocr` | 阿里云 OCR 识别封装 | `AliyunOcrClient` |
-| `core:image` | 图片压缩、裁剪、加载 | `ImageCompressor`, `ImageLoader` |
+| `core:ocr` | 阿里云 OCR 识别封装（recognizeEduQuestionOcrWithOptions 接口，PNG 格式不压缩） | `AliyunOcrClient` |
+| `core:image` | 图片压缩、裁剪、加载 | `ImageCompressor`, `ImageLoader`, `CropSelectionView` |
 
 ---
 
@@ -886,9 +887,10 @@ data class AddQuestionUiState(
 enum class AddQuestionStep {
     SELECT_SOURCE,     // Step 1: 选择图片来源
     CAMERA_CAPTURE,    // Step 2: 相机拍摄
-    OCR_RECOGNIZING,   // Step 3: OCR 识别中
-    CONFIRM_RESULT,    // Step 4: 确认识别结果
-    FILL_INFO          // Step 5: 补充信息
+    SELECT_REGION,      // Step 3: 选择错题区域（裁剪）
+    OCR_RECOGNIZING,   // Step 4: OCR 识别中
+    CONFIRM_RESULT,    // Step 5: 确认识别结果
+    FILL_INFO          // Step 6: 补充信息
 }
 
 /**
@@ -902,6 +904,26 @@ data class QuestionDetailUiState(
     val isDeleting: Boolean = false,
     val deleteSuccess: Boolean = false
 )
+
+/**
+ * CropSelectionView 自定义视图
+ *
+ * 用于用户选择错题区域的自定义 View，支持拖动和缩放选择框。
+ *
+ * **主要功能：**
+ * - 显示拍摄/选择的图片
+ * - 支持拖动选择框移动位置
+ * - 支持拖动四角和边中点缩放选择框
+ * - 提供网格线辅助对齐（九宫格）
+ * - 返回归一化的裁剪坐标（0-1 范围）
+ *
+ * **关键方法：**
+ * - `setImageBitmap(bmp: Bitmap)` - 设置待裁剪图片
+ * - `getCropRect(): DomainRect?` - 获取归一化裁剪区域
+ * - `cropBitmap(): Bitmap?` - 执行裁剪并返回结果
+ * - `resetCrop()` - 重置为默认位置
+ */
+class CropSelectionView : View { ... }
 
 /**
  * 用户事件（MVI 风格）
@@ -1439,7 +1461,7 @@ sequenceDiagram
   participant ViewModel
   participant Repository
   participant Camera
-  participant OssService
+  participant CropSelectionView
   participant OcrService
 
   用户->>UI: 点击底部添加按钮
@@ -1451,12 +1473,14 @@ sequenceDiagram
   alt 权限已授权
     用户->>UI: 拍摄照片
     UI->>ViewModel: CaptureImage(path)
-    ViewModel->>Repository: uploadImage(path)
-    Repository->>OssService: 上传到 OSS
-    OssService-->>Repository: 返回云端 URL
-    Repository->>OcrService: recognize(imageUrl)
-    OcrService-->>Repository: 返回 OCR 结果
-    Repository-->>ViewModel: Result.success(OcrResult)
+    ViewModel-->>UI: 进入选择区域页
+    UI-->>用户: 显示裁剪视图
+    用户->>CropSelectionView: 拖动/缩放选择框
+    用户->>UI: 点击确认区域
+    UI->>ViewModel: ConfirmCropRegion(rect)
+    ViewModel->>ViewModel: 裁剪图片并转为 PNG
+    ViewModel->>OcrService: recognizeTextFromBitmapPng(croppedBitmap)
+    OcrService-->>ViewModel: 返回 OCR 结果（PNG 格式，无压缩）
     ViewModel-->>UI: 进入确认结果页
     UI-->>用户: 显示识别结果
     用户->>UI: 确认识别结果
@@ -1478,11 +1502,21 @@ sequenceDiagram
 
 1. 用户点击底部「添加」按钮，弹出图片来源选择
 2. 选择拍照后检查相机权限，已授权则打开相机
-3. 拍摄后压缩图片并上传到阿里云 OSS
-4. 调用阿里云 OCR 识别题目，获取识别文本和区域信息
+3. 拍摄后显示 CropSelectionView，用户拖动/缩放选择错题区域
+4. 用户确认区域后，对裁剪区域使用 PNG 格式（不压缩）调用 `recognizeEduQuestionOcrWithOptions` 接口
 5. 判断题目是否完整，如不完整则提示重新拍摄
 6. 用户确认识别结果后进入信息补充页
 7. 填写学段、科目、错因等信息后保存
+
+**CropSelectionView 交互说明：**
+
+| 交互 | 行为 |
+|------|------|
+| 拖动选择框内部 | 移动选择框位置 |
+| 拖动四角圆点 | 等比缩放选择框 |
+| 拖动边中点方块 | 单边缩放选择框 |
+| 点击取消 | 返回相机拍摄 |
+| 点击确认 | 进入 OCR 识别 |
 
 **异常处理：**
 
@@ -1490,7 +1524,7 @@ sequenceDiagram
 |---------|---------|---------|
 | 相机权限拒绝 | 引导去设置开启 | 弹窗提示 + 跳转设置 |
 | 存储权限拒绝 | 引导去设置开启 | 弹窗提示 + 跳转设置 |
-| 图片上传失败 | 自动重试 3 次 | Toast 提示 + 重试按钮 |
+| PNG 图片上传失败 | 自动重试 3 次 | Toast 提示 + 重试按钮 |
 | OCR 识别失败 | 提示重新拍摄或手动输入 | 弹窗提示 + 手动输入入口 |
 | 题目不完整 | 过滤并提示重新拍摄 | 弹窗提示 + 重新拍摄按钮 |
 | 网络不可用 | 缓存本地，网络恢复后自动识别 | 提示离线模式 |
@@ -1760,6 +1794,7 @@ private val permissionLauncher = registerForActivityResult(
 
 **图片性能：**
 - 拍照后压缩至 1080p 长边，质量 85%
+- OCR 裁剪区域使用 PNG 格式（不压缩），保证识别准确率
 - 使用 WebP 格式存储（比 JPEG 小 30%）
 - 详情页大图使用 `ImageRequest.Builder.fetchCallback()`
 
@@ -1993,7 +2028,7 @@ fun `when remote succeeds, should cache locally and return data`() = runTest {
 2. **数据库方案**：假设使用 Room 进行本地存储，假设已有 Room 使用经验
 3. **依赖注入**：假设使用 Hilt，假设项目已集成或可接受新增 Hilt 依赖
 4. **同步策略**：假设冲突时默认保留本地最新修改，如用户有特殊要求可调整
-5. **图片压缩**：假设拍照后压缩至 1080p 长边，质量 85%，如不符合产品要求请告知
+5. **图片压缩**：假设拍照后压缩至 1080p 长边，质量 85%；OCR 裁剪区域使用 PNG 格式（不压缩）以保证识别准确率
 6. **导出格式**：假设使用 Apache POI 生成 Word，iText 生成 PDF
 
 ---
